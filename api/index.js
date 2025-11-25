@@ -22,6 +22,7 @@ const REFERRAL_COMMISSION_RATE = 0.05;
 const SPIN_SECTORS = [5, 10, 15, 20, 5]; 
 const DAILY_MAX = 100; // حد الإعلانات اليومي
 const DAILY_MAX_SPINS = 15; // حد الدوران اليومي
+const MIN_WITHDRAW_AMOUNT = 400; // الحد الأدنى للسحب
 
 /**
  * Helper function to randomly select a prize from the defined sectors.
@@ -69,8 +70,10 @@ async function supabaseFetch(tableName, method, body = null, queryParams = '?sel
       const responseText = await response.text();
       try {
           const jsonResponse = JSON.parse(responseText);
-          return jsonResponse.length > 0 ? jsonResponse : { success: true }; 
+          // Supabase returns an array for successful GET/POST/PATCH. Check for success flag in case of empty response.
+          return Array.isArray(jsonResponse) ? jsonResponse : { success: true }; 
       } catch (e) {
+          // Empty response or non-JSON success
           return { success: true }; 
       }
   }
@@ -137,15 +140,16 @@ function validateInitData(initData) {
             user = JSON.parse(data.user);
             data.user = user;
         } else {
-             return false; // User data is essential for ID confirmation
+             // User data is essential for ID confirmation
+             return false; 
         }
     } catch(e) {
         return false;
     }
     
-    // Check for expiration (optional, but good practice)
-    if (data.auth_date && (Date.now() / 1000 - data.auth_date) > 86400) { // 24 hours
-        console.warn("InitData expired.");
+    // Check for expiration (optional, but good practice, default 24 hours)
+    if (data.auth_date && (Date.now() / 1000 - data.auth_date) > 86400) { 
+        // console.warn("InitData expired.");
         // return false; 
     }
 
@@ -162,10 +166,14 @@ function validateInitData(initData) {
  * @returns {Object|null} The validated InitData object or null on failure.
  */
 async function securityPreCheck(res, body) {
-    const { init_data } = body;
+    const { init_data, user_id } = body;
 
     if (!init_data) {
         sendError(res, 'Missing Telegram WebApp initialization data for security check.', 403);
+        return null;
+    }
+    if (!user_id) {
+        sendError(res, 'Missing user_id in request body.', 403);
         return null;
     }
 
@@ -177,7 +185,7 @@ async function securityPreCheck(res, body) {
     }
     
     // Ensure the user_id in the body matches the validated user_id from initData
-    if (String(validatedData.user.id) !== String(body.user_id)) {
+    if (!validatedData.user || String(validatedData.user.id) !== String(user_id)) {
          sendError(res, 'User ID mismatch. Security check failed.', 403);
          return null;
     }
@@ -187,14 +195,11 @@ async function securityPreCheck(res, body) {
 
 // --- API Handlers ---
 
-// handleGetUserData و handleRegister و handleSpinResult و handleWithdraw بحاجة إلى تحديث لتضمين securityPreCheck
-
 /**
- * HANDLER: type: "getUserData" - لا يحتاج لـ securityPreCheck لأنه للقراءة فقط
+ * HANDLER: type: "getUserData" - Read-only, no signature check required
  * Fetches the current user data (balance, counts, history, and referrals) for UI initialization.
  */
 async function handleGetUserData(req, res, body) {
-    // ... (logic remains mostly the same, ensuring user_id is present)
     const { user_id } = body;
 
     if (!user_id) {
@@ -205,7 +210,9 @@ async function handleGetUserData(req, res, body) {
     try {
         // 1. Fetch user data (balance, ads_watched_today, spins_today)
         const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance,ads_watched_today,spins_today`);
+        
         if (!users || users.length === 0 || users.success) {
+            // User not found, return default zero values
             return sendSuccess(res, { 
                 balance: 0, 
                 ads_watched_today: 0, 
@@ -239,11 +246,10 @@ async function handleGetUserData(req, res, body) {
 
 
 /**
- * 1) type: "register" - لا يحتاج لـ securityPreCheck لأنه يتم استدعاؤه قبل توفر initData أحياناً
+ * 1) type: "register" - No signature check required, often called without full initData
  * Creates a new user if they don't exist.
  */
 async function handleRegister(req, res, body) {
-    // ... (logic remains the same)
   const { user_id, ref_by } = body;
   const id = parseInt(user_id);
 
@@ -271,7 +277,7 @@ async function handleRegister(req, res, body) {
 
 /**
  * 2) type: "watchAd"
- * 🔒 الحماية: توقيع تليجرام + التحقق الصارم من الحد اليومي (100) + حساب عمولة الإحالة على الخادم.
+ * 🔒 PROTECTION: Telegram Signature Check + Strict Daily Limit (100) + Server-side Commission.
  */
 async function handleWatchAd(req, res, body) {
     // ⬅️ تحقق أمني من توقيع تليجرام
@@ -303,10 +309,10 @@ async function handleWatchAd(req, res, body) {
           { balance: newBalance, ads_watched_today: newAdsCount }, 
           `?id=eq.${id}`);
 
-        // 3. Save to ads_history
-        await supabaseFetch('ads_history', 'POST', 
-          { user_id: id, reward }, 
-          '?select=user_id');
+        // 3. Save to ads_history (Optional, depends on your schema)
+        // await supabaseFetch('ads_history', 'POST', 
+        //   { user_id: id, reward }, 
+        //   '?select=user_id');
 
         // 4. 💰 معالجة عمولة الإحالة (تلقائيًا على الخادم)
         if (user.ref_by) {
@@ -322,10 +328,10 @@ async function handleWatchAd(req, res, body) {
                    { balance: newRefBalance }, 
                    `?id=eq.${user.ref_by}`);
 
-                 // Add record to commission_history
-                 await supabaseFetch('commission_history', 'POST', 
-                   { referrer_id: user.ref_by, referee_id: id, amount: commissionAmount, source_reward: reward }, 
-                   '?select=referrer_id');
+                 // Add record to commission_history (Optional, depends on your schema)
+                 // await supabaseFetch('commission_history', 'POST', 
+                 //   { referrer_id: user.ref_by, referee_id: id, amount: commissionAmount, source_reward: reward }, 
+                 //   '?select=referrer_id');
              }
         }
 
@@ -340,7 +346,7 @@ async function handleWatchAd(req, res, body) {
 
 /**
  * 3) type: "spin"
- * 🔒 الحماية: توقيع تليجرام + التحقق الصارم من الحد اليومي (15).
+ * 🔒 PROTECTION: Telegram Signature Check + Strict Daily Limit (15).
  */
 async function handleSpin(req, res, body) {
     // ⬅️ تحقق أمني من توقيع تليجرام
@@ -370,10 +376,10 @@ async function handleSpin(req, res, body) {
           { spins_today: newSpinsCount }, 
           `?id=eq.${id}`);
 
-        // 3. Save to spin_requests
-        await supabaseFetch('spin_requests', 'POST', 
-          { user_id: id }, 
-          '?select=user_id');
+        // 3. Save to spin_requests (Optional, depends on your schema)
+        // await supabaseFetch('spin_requests', 'POST', 
+        //   { user_id: id }, 
+        //   '?select=user_id');
 
         sendSuccess(res, { new_spins_today: newSpinsCount });
     } catch (error) {
@@ -384,7 +390,7 @@ async function handleSpin(req, res, body) {
 
 /**
  * 4) type: "spinResult"
- * 🔒 الحماية: توقيع تليجرام.
+ * 🔒 PROTECTION: Telegram Signature Check.
  */
 async function handleSpinResult(req, res, body) {
     // ⬅️ تحقق أمني من توقيع تليجرام
@@ -392,12 +398,13 @@ async function handleSpinResult(req, res, body) {
     if (!validatedData) return;
     
     const id = parseInt(validatedData.user.id);
+    // ⬅️ يتم احتساب الجائزة عشوائيا على الخادم لضمان عدم الغش
     const prize = calculateRandomSpinPrize(); 
 
     try {
         // 1. Fetch current user balance
         const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance`);
-        if (!Array.isArray(users) || users.length === 0) {
+        if (!ArrayOf(users) || users.length === 0) {
             return sendError(res, 'User not found.', 404);
         }
         
@@ -408,10 +415,10 @@ async function handleSpinResult(req, res, body) {
           { balance: newBalance }, 
           `?id=eq.${id}`);
 
-        // 3. Save to spin_results
-        await supabaseFetch('spin_results', 'POST', 
-          { user_id: id, prize }, 
-          '?select=user_id');
+        // 3. Save to spin_results (Optional, depends on your schema)
+        // await supabaseFetch('spin_results', 'POST', 
+        //   { user_id: id, prize }, 
+        //   '?select=user_id');
 
         sendSuccess(res, { new_balance: newBalance, actual_prize: prize }); 
     } catch (error) {
@@ -422,7 +429,7 @@ async function handleSpinResult(req, res, body) {
 
 /**
  * 5) type: "withdraw"
- * 🔒 الحماية: توقيع تليجرام + تحقق من الحد الأدنى والرصيد.
+ * 🔒 PROTECTION: Telegram Signature Check + Check Minimum and Balance.
  */
 async function handleWithdraw(req, res, body) {
     // ⬅️ تحقق أمني من توقيع تليجرام
@@ -444,8 +451,9 @@ async function handleWithdraw(req, res, body) {
         }
 
         const currentBalance = users[0].balance;
-        if (amount < 400) { 
-            return sendError(res, 'Minimum withdrawal is 400 SHIB.', 403);
+        
+        if (amount < MIN_WITHDRAW_AMOUNT) { 
+            return sendError(res, `Minimum withdrawal is ${MIN_WITHDRAW_AMOUNT} SHIB.`, 403);
         }
         if (amount > currentBalance) {
             return sendError(res, 'Insufficient balance.', 403);
@@ -476,7 +484,7 @@ async function handleWithdraw(req, res, body) {
 // --- Main Handler for Vercel/Serverless ---
 
 module.exports = async (req, res) => {
-    // ... (CORS and method checks) ...
+    // Enable CORS for development/testing
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -511,10 +519,6 @@ module.exports = async (req, res) => {
 
     if (!body || !body.type) {
         return sendError(res, 'Missing "type" field in the request body.', 400);
-    }
-    
-    if (!body.user_id && body.type !== 'commission') { // Commission is removed, but keep check general
-        return sendError(res, 'Missing user_id in the request body.', 400);
     }
     
     // Route the request based on the 'type' field
