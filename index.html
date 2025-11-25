@@ -474,6 +474,49 @@ You will earn 5% of the revenue from every referral you bring through ads!
 
         /* ===== Telegram User & Referral Setup (التعديلات الرئيسية هنا) ===== */
         Telegram.WebApp.ready();
+        
+        // **[تعديل جديد]: تعريف نقطة نهاية الـ API والدالة العامة للاتصال**
+        const API_ENDPOINT = 'https://sjiba-win.vercel.app/api'; // يجب استبدال [VERCEL_API_URL] بالعنوان الفعلي
+        
+        /**
+         * دالة عامة لإرسال البيانات إلى الـ Backend باستخدام Fetch API.
+         */
+        async function sendDataToBackend(payload) {
+            try {
+                // إظهار شريط التحميل أو مؤشر الانتظار (اختياري)
+                Telegram.WebApp.MainButton.setText('Sending Request...').show();
+                
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                Telegram.WebApp.MainButton.hide(); // إخفاء زر التحميل
+
+                // يجب أن يعود الـ Backend برد JSON
+                const result = await response.json();
+                
+                if (!result.ok) {
+                    console.error("Backend Error:", result.error);
+                    Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+                    Telegram.WebApp.showAlert('❌ فشل حفظ البيانات: ' + (result.error || 'خطأ غير معروف'));
+                    return false;
+                }
+                
+                // نجاح الطلب
+                Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                return true;
+
+            } catch (error) {
+                Telegram.WebApp.MainButton.hide(); // إخفاء زر التحميل حتى في حالة الخطأ
+                console.error("Fetch Error:", error);
+                Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+                Telegram.WebApp.showAlert('❌ خطأ في الشبكة. يرجى التحقق من اتصالك.');
+                return false;
+            }
+        }
+        
         let tgUser = null;
         if(Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user){
             tgUser = Telegram.WebApp.initDataUnsafe.user;
@@ -533,9 +576,9 @@ You will earn 5% of the revenue from every referral you bring through ads!
 
 
         /**
-         * دالة لمحاكاة تسجيل المستخدم وإرسال ref_by إلى البوت (API).
+         * دالة لمحاكاة تسجيل المستخدم وإرسال ref_by إلى الـ Backend باستخدام Fetch.
          */
-        function registerUser() {
+        async function registerUser() { // **[تعديل: تم جعلها async]**
             if (!tgUser) {
                 console.error('User data not available. Cannot register.');
                 return;
@@ -548,10 +591,12 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 ref_by: referrerId ? referrerId : null 
             };
 
-            // إرسال البيانات إلى البوت لمعالجتها في الخلفية
-            Telegram.WebApp.sendData(JSON.stringify(registrationPayload));
-
-            console.log('Registration data sent to bot with ref_by:', registrationPayload.ref_by);
+            // **[تعديل: استخدام sendDataToBackend بدلاً من Telegram.WebApp.sendData]**
+            const success = await sendDataToBackend(registrationPayload);
+            
+            if (success) {
+                 console.log('Registration data sent to backend with ref_by:', registrationPayload.ref_by);
+            }
         }
 
         /* ===== أنظمة المكافآت والحدود وحماية النقرات السريعة ===== */
@@ -604,7 +649,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
             }
         }
         
-        function watchAds(){
+        async function watchAds(){ // **[تعديل: تم جعلها async]**
             const now = Date.now();
             const lastClick = parseInt(sessionStorage.getItem('lastAdClickTime') || 0);
 
@@ -622,7 +667,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
             
             // **[تعديل]: استبدال محاكاة الإعلان باستدعاء GigaPub**
             window.showGiga()
-                .then(() => {
+                .then(async () => { // **[تعديل: تم جعل الـ then async]**
                     // **منطق المكافأة يُنقل إلى هنا (بعد عرض الإعلان بنجاح)**
                     shibBalance += REWARD_PER_AD;
                     adsWatchedToday += 1;
@@ -631,7 +676,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     if (referrerId && tgUser) {
                         const commissionAmount = REWARD_PER_AD * REFERRAL_COMMISSION_RATE; // 3 * 0.05 = 0.15 SHIB
                         
-                        // إرسال حمولة (Payload) إلى البوت لطلب إضافة العمولة لرصيد المُحيل (Referrer)
+                        // إرسال حمولة (Payload) إلى الـ Backend لطلب إضافة العمولة
                         const commissionPayload = {
                             type: 'commission',
                             referrer_id: referrerId,
@@ -639,7 +684,8 @@ You will earn 5% of the revenue from every referral you bring through ads!
                             amount: commissionAmount,
                             source_reward: REWARD_PER_AD 
                         };
-                        Telegram.WebApp.sendData(JSON.stringify(commissionPayload));
+                        // **[تعديل: استخدام sendDataToBackend بدلاً من Telegram.WebApp.sendData]**
+                        await sendDataToBackend(commissionPayload);
                         
                         console.log(`Sent commission request of ${commissionAmount} SHIB to referrer ${referrerId}`);
                     }
@@ -891,7 +937,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
             container.innerHTML = tableHTML;
         }
 
-        function confirmWithdraw(){
+        async function confirmWithdraw(){ // **[تعديل: تم جعلها async]**
             const binanceId = document.getElementById('binanceId').value.trim();
             const amount = parseInt(document.getElementById('withdrawAmount').value);
             
@@ -899,9 +945,23 @@ You will earn 5% of the revenue from every referral you bring through ads!
             if(isNaN(amount) || amount < 400){ alert('Minimum withdrawal is 400 SHIB.'); return; }
             if(amount > shibBalance){ alert('Insufficient balance. Your current balance is ' + shibBalance.toLocaleString() + ' SHIB.'); return; }
             
-            const payload = JSON.stringify({type:'withdraw',binanceId,amount});
-            Telegram.WebApp.sendData(payload);
+            // **[تعديل: تجهيز الحمولة وإضافة user_id]**
+            const payloadObject = {
+                type:'withdraw',
+                binanceId,
+                amount,
+                user_id: tgUser.id // إضافة user_id لكي يستطيع الـ Backend تسجيله
+            };
             
+            // **[تعديل: استخدام sendDataToBackend بدلاً من Telegram.WebApp.sendData]**
+            const success = await sendDataToBackend(payloadObject);
+            
+            // إذا لم ينجح الإرسال إلى الـ Backend، نوقف عملية تحديث الرصيد المحلي
+            if (!success) {
+                return; 
+            }
+            
+            // إذا نجح الإرسال، نحدث الرصيد والسجل محلياً
             shibBalance -= amount;
             
             // إضافة السحب الجديد إلى السجل
