@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SHIB Ads WebApp</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/js-sha256@0.9.0/src/sha256.min.js"></script> 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap'); 
@@ -470,8 +469,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
 
         /* ===== Telegram User & Referral Setup ===== */
         Telegram.WebApp.ready();
-        
-        let tgUser = null; 
+        let tgUser = null;
         if(Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user){
             tgUser = Telegram.WebApp.initDataUnsafe.user;
             const photoUrl = tgUser.photo_url;
@@ -507,39 +505,21 @@ You will earn 5% of the revenue from every referral you bring through ads!
         let referrerId = getRefParam();
         const API_URL = '/api'; 
 
-        // ⬅️ جديد: المفتاح السري للعميل (يجب أن يكون مخفياً في بيئة الإنتاج الحقيقية)
-        const CLIENT_SECRET_KEY = 'your-very-secret-key-replace-me'; 
         // ------------------------------------------------------------------
-        
-        /**
-         * NEW: Generates the SHA256 signature for the request.
-         * @param {number} user_id The Telegram user ID.
-         * @param {string} type The API request type (e.g., 'watchAd').
-         * @returns {string} The SHA256 signature string.
-         */
-        function generateSignature(user_id, type) {
-            if (typeof sha256 !== 'function') {
-                console.error('SHA-256 library not loaded.');
-                return '';
-            }
-            const dataToSign = `${user_id}:${type}:${CLIENT_SECRET_KEY}`;
-            return sha256(dataToSign); 
-        }
-
-        // ------------------------------------------------------------------
-        // **دالة fetchApi** (مع التحقق الأمني من دوال Telegram)
+        // **دالة fetchApi** (مع التحقق الأمني من دوال Telegram) - تم التعديل هنا
         // ------------------------------------------------------------------
         async function fetchApi(payload) {
-            if (!tgUser || !tgUser.id) {
-                const errorMsg = 'Missing Telegram WebApp initialization data for security check.';
-                Telegram.WebApp.showAlert(`❌ API Error: ${errorMsg}`);
-                return { ok: false, error: errorMsg };
-            }
+            // 1. الحصول على سلسلة التحقق initData الكاملة
+            const initData = Telegram.WebApp.initData || '';
 
-            // ⬅️ جديد: إنشاء التوقيع للطلبات الحساسة
-            const sensitiveTypes = ['watchAd', 'spin', 'spinResult', 'withdraw'];
-            if (sensitiveTypes.includes(payload.type)) {
-                payload.signature = generateSignature(tgUser.id, payload.type);
+            // 2. التحقق من وجود بيانات المستخدم وسلسلة التحقق
+            if (!tgUser || !initData) { 
+                const errorMsg = 'Missing Telegram WebApp initialization data for security check.';
+                if (typeof Telegram.WebApp.showAlert === 'function') {
+                    Telegram.WebApp.showAlert(`❌ API Error: ${errorMsg}`);
+                }
+                console.error('Security Check Failed:', errorMsg);
+                return { ok: false, error: errorMsg }; 
             }
 
             if (typeof Telegram.WebApp.showProgress === 'function') {
@@ -554,7 +534,8 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     },
                     body: JSON.stringify({
                         ...payload,
-                        user_id: tgUser.id
+                        user_id: tgUser.id,
+                        init_data: initData // ⬅️ الإضافة الحاسمة التي يتوقعها الخادم
                     }),
                 });
 
@@ -585,6 +566,8 @@ You will earn 5% of the revenue from every referral you bring through ads!
         /* ===== أنظمة المكافآت والحدود وحماية النقرات السريعة (الحدود لا تزال هنا للعرض فقط) ===== */
         const DAILY_MAX = 100;
         const DAILY_MAX_SPINS = 15;
+        // ملاحظة: قيم المكافأة (3 SHIB والعمولة 5%) تمت إزالتها واعتمادها بالكامل على الخادم.
+
         const ADS_CLICK_COOLDOWN  = 1000;
         const SPIN_CLICK_COOLDOWN = 1000; 
 
@@ -628,11 +611,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
         }
         
         async function initDailyProgress(){
-            if (!tgUser) {
-                // قد يظهر هذا الخطأ إذا لم يتم تشغيل التطبيق من داخل Telegram Mini App
-                console.error("Telegram User data is not available. Cannot initialize progress.");
-                return;
-            }
+            if (!tgUser) return;
 
             // 1. التسجيل/التحقق من الوجود
             await fetchApi({ 
@@ -680,15 +659,20 @@ You will earn 5% of the revenue from every referral you bring through ads!
             }
             sessionStorage.setItem('lastAdClickTime', now);
             
+            if(adsWatchedToday >= DAILY_MAX){
+                Telegram.WebApp.showAlert('✅ You have reached the daily limit of 100 ads. Come back tomorrow!');
+                return;
+            }
+            
             window.showGiga()
                 .then(async () => {
-                    // 1. طلب مكافأة الإعلان من الخادم 
+                    // 1. طلب مكافأة الإعلان من الخادم (بدون إرسال قيمة المكافأة)
                     const adResult = await fetchApi({
-                        type: 'watchAd' 
+                        type: 'watchAd' // ⬅️ الخادم يحدد المكافأة (3 SHIB)
                     });
 
                     if (adResult.ok) {
-                        const actualReward = adResult.data.actual_reward; 
+                        const actualReward = adResult.data.actual_reward; // ⬅️ استلام المكافأة الفعلية من الخادم
                         
                         // 2. تحديث الواجهة بالقيم الموثوقة من الخادم
                         updateState({
@@ -698,6 +682,8 @@ You will earn 5% of the revenue from every referral you bring through ads!
                         
                         // 3. منطق عمولة الإحالة (يرسل طلب عمولة منفصل)
                         if (referrerId) {
+                            
+                            // ⬅️ نرسل طلب العمولة، الخادم سيحسبها بنفسه
                             fetchApi({
                                 type: 'commission',
                                 referrer_id: referrerId,
@@ -712,9 +698,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
                         if(adResult.data.new_ads_count >= DAILY_MAX){
                             Telegram.WebApp.showAlert('🎉 Great! You completed 100 ads today.');
                         }
-                    } else {
-                        // في حالة فشل الخادم بسبب التوقيع أو الحد الأقصى، يتم عرض رسالة الخطأ
-                        // ولا يلزم إعادة تحميل البيانات.
                     }
                 })
                 .catch(e => {
@@ -839,11 +822,14 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 return;
             }
             sessionStorage.setItem('lastSpinClickTime', now);
+
+            if (spinsToday >= DAILY_MAX_SPINS) {
+                Telegram.WebApp.showAlert('⚠️ لقد وصلت إلى الحد الأقصى للدوران اليومي (15 مرة). يرجى العودة غداً!');
+                return;
+            }
             
             // 1. طلب تسجيل طلب الدوران أولاً
-            const spinReqResult = await fetchApi({ 
-                type: 'spin' 
-            });
+            const spinReqResult = await fetchApi({ type: 'spin' });
 
             if (!spinReqResult.ok) {
                 return; 
@@ -872,12 +858,12 @@ You will earn 5% of the revenue from every referral you bring through ads!
                         
                         // 3. طلب تسجيل نتيجة الدوران وإضافة الجائزة للرصيد (بدون إرسال قيمة الجائزة!)
                         const spinResultPayload = {
-                            type: 'spinResult' 
+                            type: 'spinResult' // ⬅️ إرسال نوع الطلب فقط، الخادم يحسب الجائزة
                         };
                         const spinResultRes = await fetchApi(spinResultPayload);
                         
                         if (spinResultRes.ok) {
-                            const finalPrize = spinResultRes.data.actual_prize; 
+                            const finalPrize = spinResultRes.data.actual_prize; // ⬅️ استلام الجائزة الحقيقية من الخادم
                             
                             // 4. تحديث الرصيد بالرصيد الموثوق من الخادم
                             updateState({ balance: spinResultRes.data.new_balance });
@@ -956,15 +942,16 @@ You will earn 5% of the revenue from every referral you bring through ads!
             const binanceId = document.getElementById('binanceId').value.trim();
             const amount = parseInt(document.getElementById('withdrawAmount').value);
             
+            // ⬅️ لا يزال التحقق المحلي موجودًا لتجربة المستخدم، لكن التحقق الحاسم يحدث على الخادم
             if(!binanceId || binanceId.length < 8){ Telegram.WebApp.showAlert('Please enter a valid Binance User ID (min 8 digits).'); return; }
             if(isNaN(amount) || amount < 400){ Telegram.WebApp.showAlert('Minimum withdrawal is 400 SHIB.'); return; }
             if(amount > shibBalance){ Telegram.WebApp.showAlert('Insufficient balance. Your current balance is ' + shibBalance.toLocaleString() + ' SHIB.'); return; }
             
             // 1. إرسال طلب السحب عبر API
             const result = await fetchApi({
-                type: 'withdraw', 
+                type: 'withdraw',
                 binanceId: binanceId,
-                amount: amount 
+                amount: amount // ⬅️ يتم التحقق من صحة المبلغ والرصيد على الخادم
             });
 
             if (result.ok) {
