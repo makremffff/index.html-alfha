@@ -50,8 +50,18 @@
             100% { opacity: 1; transform: scale(1.05); }
         }
 
-        /* الشاشة الرئيسية */
-        .main-screen{position:fixed;inset:0;background:#f5f7fa;opacity:0;transition:opacity .5s ease-in;display:flex;flex-direction:column}
+        /* الشاشة الرئيسية - تم التعديل هنا */
+        .main-screen{
+            position:fixed;
+            inset:0;
+            /* التعديل: استخدام صورة img.png كخلفية */
+            background: url('img.png') no-repeat center center; 
+            background-size: cover; 
+            opacity:0;
+            transition:opacity .5s ease-in;
+            display:flex;
+            flex-direction:column
+        }
         .main-screen.visible{opacity:1}
         .main-content{flex:1;display:flex;justify-content:center;align-items:center}
         
