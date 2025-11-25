@@ -15,7 +15,7 @@
         /* شاشة التحميل - تحسينات النيون */
         .loading-screen{
             position:fixed;inset:0;
-            background: #0d0c1d; /* خلفية داكنة صلبة */
+            background: #0d0c1d;
             display:flex;flex-direction:column;justify-content:center;align-items:center;
             z-index:9999;transition:opacity .5s ease-out;
         }
@@ -24,12 +24,12 @@
         .progress-container{
             width:300px;height:12px;background:rgba(255,255,255,.05);
             border-radius:10px;overflow:hidden;margin:2.5rem 0;
-            box-shadow:0 0 15px rgba(0,255,255,0.4); /* توهج نيون */
-            border:2px solid #00ffff; /* إطار نيون */
+            box-shadow:0 0 15px rgba(0,255,255,0.4);
+            border:2px solid #00ffff;
         }
         .progress-bar{
             height:100%;
-            background:linear-gradient(90deg, #00ffff 0%, #00bfff 100%); /* تدرج نيون أزرق/سماوي */
+            background:linear-gradient(90deg, #00ffff 0%, #00bfff 100%);
             border-radius:8px;width:0;transition:width .4s ease;position:relative;overflow:hidden;
         }
         .progress-bar::after{content:'';position:absolute;top:0;left:0;bottom:0;right:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);animation:shimmer 1.5s infinite}
@@ -38,23 +38,22 @@
             font-size: 2.5rem; 
             font-family:'Orbitron', sans-serif; 
             color:#fff;margin-top:1rem;
-            text-shadow:0 0 10px #00ffff, 0 0 20px rgba(0,255,255,0.8); /* توهج نيون أقوى */
+            text-shadow:0 0 10px #00ffff, 0 0 20px rgba(0,255,255,0.8);
             letter-spacing: 2px;
         }
         .loading-text{
             font-size:1.2rem;color:rgba(255,255,255,.9);margin-top:1rem;text-shadow:0 1px 2px rgba(0,0,0,.5);
-            animation: pulse 1.5s infinite alternate; /* حركة نبض خفيفة */
+            animation: pulse 1.5s infinite alternate;
         }
         @keyframes pulse {
             0% { opacity: 0.7; transform: scale(1); }
             100% { opacity: 1; transform: scale(1.05); }
         }
 
-        /* الشاشة الرئيسية - تم التعديل هنا */
+        /* الشاشة الرئيسية */
         .main-screen{
             position:fixed;
             inset:0;
-            /* التعديل: استخدام صورة img.png كخلفية */
             background: url('img.png') no-repeat center center; 
             background-size: cover; 
             opacity:0;
@@ -65,32 +64,29 @@
         .main-screen.visible{opacity:1}
         .main-content{flex:1;display:flex;justify-content:center;align-items:center}
         
-        /* التعديل: الدائرة نفسها - بدون تغييرات كبيرة */
+        /* دائرة المستخدم */
         .user-circle{
             position:absolute;top:20px;left:20px;width:70px;height:70px;border:2px dashed #ccc;
             border-radius:50%;display:flex;flex-direction:column;justify-content:center;
             align-items:center;cursor:pointer;transition:all .3s ease;z-index:100;overflow:hidden
         }
         .user-circle:hover{border-color:#4a90e2;background:rgba(74,144,226,.05)}
-        /* ضمان عرض الصورة بشكل صحيح */
         .user-circle img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:none}
         .user-circle .placeholder{color:#999;font-size:12px;text-align:center}
         
-        /* التعديل المطلوب: وضع الاسم تحت الدائرة مباشرة */
         .user-username{
             position: absolute;
-            top: 95px; /* (20px Top + 70px Height) + 5px Margin */
+            top: 95px;
             left: 20px;
-            width: 70px; /* نفس عرض الدائرة للتوسيط */
+            width: 70px;
             font-size:13px;color:#555;white-space:nowrap;
             text-align: center;
             overflow: hidden;
-            text-overflow: ellipsis; /* لإظهار "..." للنصوص الطويلة */
+            text-overflow: ellipsis;
         }
-        /* التعديل المطلوب: وضع الـ ID تحت الاسم مباشرة */
         .user-id{
             position: absolute;
-            top: 115px; /* أسفل الاسم بمسافة مناسبة */
+            top: 115px;
             left: 20px;
             width: 70px;
             font-size:11px;color:#888;white-space:nowrap;
@@ -130,22 +126,22 @@
         .daily-progress-fill {height:100%;background:linear-gradient(90deg,#00f2fe,#4facfe);border-radius:10px;width:0%;transition:width .4s ease}
         .spin-progress-fill {height:100%;background:linear-gradient(90deg,#ff8c00, #ff4500);border-radius:10px;width:0%;transition:width .4s ease}
 
-        /* تعديلات الأزرار لتكون متساوية الحجم ومناسبة للشاشة */
+        /* تعديلات الأزرار */
         .button-container{
             position:absolute;bottom:40px;left:50%;transform:translateX(-50%);
-            display:flex;gap:10px; /* تقليل المسافة بين الأزرار */
-            background:rgba(240,240,240,.9);padding:15px 15px; /* تقليل الحشوة */
+            display:flex;gap:10px;
+            background:rgba(240,240,240,.9);padding:15px 15px;
             border-radius:20px;box-shadow:0 4px 15px rgba(0,0,0,.1);backdrop-filter:blur(10px);
-            width: 90%; /* جعل الحاوية تتسع لـ 90% من عرض الشاشة */
-            max-width: 400px; /* حد أقصى للحاويات العريضة */
+            width: 90%;
+            max-width: 400px;
         }
         .nav-button{
-            position:relative;background:linear-gradient(145deg,#4a90e2,#357abd);color:#fff;border:none;padding:10px 5px; /* تقليل حشوة النص */
+            position:relative;background:linear-gradient(145deg,#4a90e2,#357abd);color:#fff;border:none;padding:10px 5px;
             border-radius:10px;font-size:14px;font-weight:bold;cursor:pointer;transition:all .1s ease;
-            flex-grow: 1; /* الأهم: يجعل الأزرار تتوزع بالتساوي */
-            min-width: auto; /* إزالة الحد الأدنى للعرض */
+            flex-grow: 1;
+            min-width: auto;
             text-transform:uppercase;letter-spacing:.5px;box-shadow:0 5px 0 #2c5aa0,0 8px 12px rgba(0,0,0,.15);transform:translateY(0);
-            text-align: center; /* لضمان توسيط النص حتى مع تغير العرض */
+            text-align: center;
         }
         .nav-button:hover{transform:translateY(-1px);box-shadow:0 6px 0 #2c5aa0,0 10px 15px rgba(0,0,0,.2)}
         .nav-button:active{transform:translateY(2px);box-shadow:0 3px 0 #2c5aa0,0 5px 8px rgba(0,0,0,.15)}
@@ -176,12 +172,12 @@
         .spin-back{margin-top:25px;background:#6c757d;color:#fff;border:none;padding:10px 25px;border-radius:8px;font-size:15px;font-weight:bold;cursor:pointer;box-shadow:0 4px 0 #5a6268}
         .spin-back:active{transform:translateY(2px);box-shadow:0 2px 0 #5a6268}
 
-        /* ===== شاشة Withdraw - احترافية ومحسنة ===== */
+        /* ===== شاشة Withdraw ===== */
         .withdraw-screen{
             position:fixed;inset:0;background:#f5f7fa; 
             display:flex;flex-direction:column;align-items:center;padding:20px 20px;
             opacity:0;pointer-events:none;transition:opacity .3s ease;
-            overflow-y: auto; /* للسماح بالتمرير في حال كان المحتوى طويلاً */
+            overflow-y: auto;
         }
         .withdraw-screen.visible{opacity:1;pointer-events:auto}
         .withdraw-header{
@@ -261,11 +257,11 @@
         .history-table tr:last-child td{
             border-bottom: none;
         }
-        .status-pending{color: #ff8c00; font-weight: bold;} /* برتقالي */
-        .status-completed{color: #28a745; font-weight: bold;} /* أخضر */
+        .status-pending{color: #ff8c00; font-weight: bold;}
+        .status-completed{color: #28a745; font-weight: bold;}
         .no-records{text-align: center; color: #999; padding: 20px;}
         
-        /* ===== شاشة Invite الجديدة ===== */
+        /* ===== شاشة Invite ===== */
         .invite-screen{
             position:fixed;inset:0;background:#f5f7fa; 
             display:flex;flex-direction:column;align-items:center;padding:20px 20px;
@@ -305,7 +301,6 @@
             width: 100%; 
         }
         .copy-link-btn:active{transform:translateY(3px);box-shadow:0 2px 0 #005a8d}
-        /* تعديل حقل الإدخال ليظهر بشكل جيد كعرض للرابط */
         #referralLinkInput{
             text-align: center;
             cursor: pointer;
@@ -456,7 +451,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 currentProgress=100; clearInterval(loadingInterval);
                 setTimeout(()=>{
                     loadingScreen.classList.add('hidden');
-                    // تم نقل استدعاء initDailyProgress إلى هنا
                     initDailyProgress(); 
                     mainScreen.classList.add('visible');
                 },500);
@@ -494,10 +488,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
             idEl.textContent   = 'ID: ' + userId;
         }
 
-        /**
-         * الدالة المطلوبة: تستخرج رقم المُحيل (Referrer ID) من start_param فقط.
-         * @returns {string|null} رقم المستخدم المُحيل (كـ String) أو null.
-         */
         function getRefParam() {
             let referrerId = null;
             const REF_PREFIX = 'ref_';
@@ -512,11 +502,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
             return referrerId; 
         }
 
-        // متغير عام لتخزين معرف المُحيل لعمليات لاحقة
         let referrerId = getRefParam();
-        
-        // **URL الخاص بنقطة نهاية Vercel API**
-        // هذا يفترض أن الواجهة الأمامية والخلفية في نفس النطاق (كما هو الحال في Vercel)
         const API_URL = '/api'; 
 
         // ------------------------------------------------------------------
@@ -529,7 +515,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
             }
 
             try {
-                Telegram.WebApp.showProgress(); // إظهار مؤشر التحميل
+                Telegram.WebApp.showProgress();
 
                 const response = await fetch(API_URL, {
                     method: 'POST',
@@ -538,11 +524,11 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     },
                     body: JSON.stringify({
                         ...payload,
-                        user_id: tgUser.id // إضافة user_id تلقائياً
+                        user_id: tgUser.id
                     }),
                 });
 
-                Telegram.WebApp.hideProgress(); // إخفاء مؤشر التحميل
+                Telegram.WebApp.hideProgress();
 
                 const data = await response.json();
 
@@ -553,7 +539,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     return { ok: false, error: errorMessage };
                 }
 
-                return data; // تحتوي على { ok: true, data: ... }
+                return data;
             } catch (error) {
                 Telegram.WebApp.hideProgress();
                 console.error(`General Fetch Error for type ${payload.type}:`, error.message);
@@ -571,7 +557,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
         const ADS_CLICK_COOLDOWN  = 1000;
         const SPIN_CLICK_COOLDOWN = 1000; 
 
-        // **الرصيد وسجلات المستخدم - يتم تحديثها من الخادم فقط**
         let shibBalance = 0; 
         let adsWatchedToday = 0;
         let spinsToday = 0; 
@@ -593,17 +578,15 @@ You will earn 5% of the revenue from every referral you bring through ads!
             const result = await fetchApi({ type: 'getUserData' });
 
             if (result.ok) {
-                // تحديث الحالة بالبيانات الجديدة من الخادم
                 updateState({
                     balance: result.data.balance,
                     ads_watched_today: result.data.ads_watched_today,
                     spins_today: result.data.spins_today,
                     referrals_count: result.data.referrals_count,
-                    withdrawal_history: result.data.withdrawal_history.map(item => ({
+                    withdrawal_history: (result.data.withdrawal_history || []).map(item => ({
                         amount: item.amount,
                         status: item.status,
-                        // تحويل التاريخ من ISO إلى تنسيق مقروء لسهولة العرض
-                        date: new Date(item.created_at).toLocaleDateString() 
+                        date: new Date(item.created_at).toLocaleDateString('en-GB') 
                     }))
                 });
             }
@@ -612,7 +595,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
         async function initDailyProgress(){
             if (!tgUser) return;
 
-            // 1. إرسال طلب التسجيل/التحقق من الوجود أولاً
+            // 1. التسجيل/التحقق من الوجود
             await fetchApi({ 
                 type: 'register',
                 ref_by: referrerId ? referrerId : null 
@@ -626,27 +609,25 @@ You will earn 5% of the revenue from every referral you bring through ads!
             document.getElementById('shibBalance').textContent = shibBalance.toLocaleString() + ' SHIB';
             document.getElementById('withdrawBalanceDisplay').textContent = shibBalance.toLocaleString() + ' SHIB';
 
-            // Ads Progress
             document.getElementById('adsCount').textContent = adsWatchedToday;
             const adsPercent = Math.min((adsWatchedToday / DAILY_MAX) * 100, 100);
             document.getElementById('dailyProgressFill').style.width = adsPercent + '%';
 
-            // Spin Progress
             document.getElementById('spinsCount').textContent = spinsToday; 
             const spinsPercent = Math.min((spinsToday / DAILY_MAX_SPINS) * 100, 100);
             document.getElementById('spinProgressFill').style.width = spinsPercent + '%';
 
-            // Referrals Count
             document.getElementById('referralsCountDisplay').textContent = referralsCount.toLocaleString();
 
-            // حالة زر الدوران
             const spinBtn = document.getElementById('spinBtn');
-            if (spinsToday >= DAILY_MAX_SPINS) {
-                spinBtn.disabled = true;
-                spinBtn.textContent = `Limit Reached (${spinsToday}/${DAILY_MAX_SPINS})`;
-            } else if (!spinning) {
-                spinBtn.disabled = false;
-                spinBtn.textContent = 'SPIN';
+            if (spinBtn) {
+                if (spinsToday >= DAILY_MAX_SPINS) {
+                    spinBtn.disabled = true;
+                    spinBtn.textContent = `Limit Reached (${spinsToday}/${DAILY_MAX_SPINS})`;
+                } else if (!spinning) {
+                    spinBtn.disabled = false;
+                    spinBtn.textContent = 'SPIN';
+                }
             }
         }
         
@@ -665,32 +646,35 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 return;
             }
             
-            // 1. استدعاء GigaPub
             window.showGiga()
                 .then(async () => {
-                    // 2. طلب مكافأة الإعلان من الخادم
+                    // 1. طلب مكافأة الإعلان من الخادم
                     const adResult = await fetchApi({
                         type: 'watchAd',
                         reward: REWARD_PER_AD
                     });
 
                     if (adResult.ok) {
-                        // 3. تحديث الواجهة بالقيم الموثوقة من الخادم
+                        // 2. تحديث الواجهة بالقيم الموثوقة من الخادم
                         updateState({
                             balance: adResult.data.new_balance,
                             ads_watched_today: adResult.data.new_ads_count
                         });
                         
-                        // 4. منطق عمولة الإحالة (يرسل طلب عمولة منفصل)
+                        // 3. منطق عمولة الإحالة (يرسل طلب عمولة منفصل)
                         if (referrerId) {
                             const commissionAmount = REWARD_PER_AD * REFERRAL_COMMISSION_RATE;
                             
-                            await fetchApi({
+                            // نرسل طلب العمولة، لا نحتاج للانتظار
+                            fetchApi({
                                 type: 'commission',
                                 referrer_id: referrerId,
                                 referee_id: tgUser.id,
                                 amount: commissionAmount,
                                 source_reward: REWARD_PER_AD 
+                            }).then(r => {
+                                if (r.ok) { console.log('Commission sent successfully.'); }
+                                else { console.warn('Commission failed to send:', r.error); }
                             });
                         }
                         
@@ -698,8 +682,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
                         if(adResult.data.new_ads_count >= DAILY_MAX){
                             Telegram.WebApp.showAlert('🎉 Great! You completed 100 ads today.');
                         }
-                    } 
-                    // إذا فشل adResult.ok، فإن fetchApi ستعرض التنبيه بالفعل
+                    }
                 })
                 .catch(e => {
                     console.error("GigaPub Ad failed to show or was dismissed:", e);
@@ -708,14 +691,13 @@ You will earn 5% of the revenue from every referral you bring through ads!
         }
         function circleClick(){ console.log('Circle clicked'); }
 
-        /* ===== دوال شاشة Invite الجديدة (رابط الإحالة) ===== */
+        /* ===== دوال شاشة Invite ===== */
         
         function inviteFriends() {
             mainScreen.classList.remove('visible');
             document.getElementById('inviteScreen').classList.add('visible');
             generateReferralLink();
-            loadUserData(); // لضمان تحديث عدد الإحالات
-            updateUI();
+            loadUserData();
         }
 
         function hideInvite(){
@@ -732,7 +714,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
             }
             
             const userId = tgUser.id;
-            
             const botPath = "Game_win_usdtBot/earn"; 
             const inviteLink = `https://t.me/${botPath}?startapp=ref_${userId}`;
             
@@ -755,7 +736,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 Telegram.WebApp.showAlert('❌ Failed to copy link. Please try again.');
             });
         }
-        /* ===== نهاية دوال شاشة Invite الجديدة ===== */
+        /* ===== نهاية دوال شاشة Invite ===== */
 
 
         /* ===== Spin Wheel (كود العجلة) ===== */
@@ -777,7 +758,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
 
             sectors.forEach((val, i) => {
                 const start = i * arc;
-                // 1. رسم القطاع
                 ctx.beginPath();
                 ctx.fillStyle = colors[i];
                 ctx.moveTo(centerX, centerY);
@@ -785,7 +765,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 ctx.closePath();
                 ctx.fill();
 
-                // 2. حدود القطاع
                 ctx.beginPath();
                 ctx.strokeStyle = '#fff'; 
                 ctx.lineWidth = 2;
@@ -794,7 +773,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 ctx.closePath();
                 ctx.stroke();
 
-                // 3. النص
                 ctx.save();
                 ctx.fillStyle = '#111'; 
                 ctx.font = 'bold 20px Arial';
@@ -807,7 +785,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 ctx.restore();
             });
 
-            // 4. رسم دائرة المركز
             ctx.beginPath();
             ctx.fillStyle = '#fff';
             ctx.arc(centerX, centerY, 15, 0, 2 * Math.PI); 
@@ -853,7 +830,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     spinBtn.disabled = true;
                     spinResult.textContent = '';
                     
-                    // منطق الدوران (محلي)
                     const spins = 5 + Math.random()*5; 
                     const finalAngle = Math.random()*2*Math.PI;
                     const totalAngle = spins*2*Math.PI + finalAngle;
@@ -865,7 +841,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     setTimeout(async ()=>{
                         canvas.style.transition = 'none'; 
                         
-                        // حساب القطاع الفائز
                         const radPerSector = 2 * Math.PI / sectors.length;
                         let normalizedAngle = currentAngle % (2 * Math.PI);
                         let angleFromArrow = normalizedAngle + (Math.PI / 2); 
@@ -899,8 +874,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 .catch(e => {
                     console.error("GigaPub Ad failed to show or was dismissed:", e);
                     Telegram.WebApp.showAlert('❌ Failed to load ad. Spin was not counted. Please try again.');
-                    // إذا فشل الإعلان، نقوم بتحميل البيانات مرة أخرى لمعالجة أي خطأ في العد.
-                    loadUserData();
+                    loadUserData(); // إعادة تحميل البيانات لتصحيح العداد
                 });
         }
 
@@ -908,7 +882,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
         function showSpin(){
             mainScreen.classList.remove('visible');
             document.getElementById('spinScreen').classList.add('visible');
-            loadUserData(); // تحميل البيانات قبل الدخول للشاشة
+            loadUserData();
             updateUI(); 
         }
         function hideSpin(){
@@ -919,8 +893,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
         function showWithdraw(){
             mainScreen.classList.remove('visible');
             document.getElementById('withdrawScreen').classList.add('visible');
-            loadUserData(); // تحميل البيانات قبل الدخول للشاشة
-            updateUI(); 
+            loadUserData();
             displayWithdrawals(); 
         }
         
@@ -980,7 +953,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 
                 Telegram.WebApp.showAlert('✅ Withdrawal request sent successfully!\n\nBinance ID: '+binanceId+'\nAmount: '+amount.toLocaleString()+' SHIB\n\nThe amount will be transferred to your account within 24 hours.');
             }
-            // إذا فشل، فإن fetchApi ستقوم بإظهار الخطأ.
         }
     </script>
 </body>
