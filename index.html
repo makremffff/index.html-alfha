@@ -506,21 +506,24 @@ You will earn 5% of the revenue from every referral you bring through ads!
         const API_URL = '/api'; 
 
         // ------------------------------------------------------------------
-        // **دالة fetchApi** (مع التحقق الأمني من دوال Telegram) - تم التعديل هنا
+        // **دالة fetchApi** (المُعدلة لإرسال init_data)
         // ------------------------------------------------------------------
         async function fetchApi(payload) {
-            // 1. الحصول على سلسلة التحقق initData الكاملة
-            const initData = Telegram.WebApp.initData || '';
-
-            // 2. التحقق من وجود بيانات المستخدم وسلسلة التحقق
-            if (!tgUser || !initData) { 
-                const errorMsg = 'Missing Telegram WebApp initialization data for security check.';
-                if (typeof Telegram.WebApp.showAlert === 'function') {
-                    Telegram.WebApp.showAlert(`❌ API Error: ${errorMsg}`);
-                }
-                console.error('Security Check Failed:', errorMsg);
-                return { ok: false, error: errorMsg }; 
+            if (!tgUser) {
+                Telegram.WebApp.showAlert('❌ User data not initialized. Cannot perform action.');
+                return { ok: false, error: 'User not initialized' };
             }
+
+            // ⚡️ التعديل الأول: جلب بيانات init_data
+            const initData = Telegram.WebApp.initData || ''; 
+            
+            // ⚡️ (تحقق إضافي في الواجهة الأمامية) منع الإرسال إذا كانت البيانات مفقودة
+            const SECURE_TYPES = ['watchAd', 'spin', 'spinResult', 'withdraw'];
+            if (SECURE_TYPES.includes(payload.type) && initData.length < 10) { 
+                 Telegram.WebApp.showAlert('❌ Security Error: Telegram initialization data is missing. Please reopen the app from the bot.');
+                 return { ok: false, error: 'Client-side security check failed.' };
+            }
+
 
             if (typeof Telegram.WebApp.showProgress === 'function') {
                 Telegram.WebApp.showProgress();
@@ -535,7 +538,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     body: JSON.stringify({
                         ...payload,
                         user_id: tgUser.id,
-                        init_data: initData // ⬅️ الإضافة الحاسمة التي يتوقعها الخادم
+                        init_data: initData // ⚡️ التعديل الثاني: إرسال init_data
                     }),
                 });
 
