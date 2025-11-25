@@ -235,6 +235,7 @@ async function handleCommission(req, res, body) {
   const { referrer_id, referee_id } = body; // ⬅️ تم إزالة 'amount' و 'source_reward' من مدخلات العميل
 
   if (!referrer_id || !referee_id) {
+    // لا يعتبر خطأ حرج، يتم إيقاف العملية بهدوء إذا لم تتوفر بيانات الإحالة
     return sendSuccess(res, { message: 'Invalid commission data received but acknowledged.' });
   }
 
