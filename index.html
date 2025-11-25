@@ -15,7 +15,7 @@
         /* شاشة التحميل - تحسينات النيون */
         .loading-screen{
             position:fixed;inset:0;
-            background: #0d0c1d;
+            background: #0d0c1d; /* خلفية داكنة صلبة */
             display:flex;flex-direction:column;justify-content:center;align-items:center;
             z-index:9999;transition:opacity .5s ease-out;
         }
@@ -23,452 +23,375 @@
         .loading-content{text-align:center;color:#fff}
         .progress-container{
             width:300px;height:12px;background:rgba(255,255,255,.05);
-            border-radius:10px;overflow:hidden;margin:2.5rem 0;
-            box-shadow:0 0 15px rgba(0,255,255,0.4);
-            border:2px solid #00ffff;
+            border-radius:10px;overflow:hidden;margin:20px 0;
+            box-shadow: 0 0 5px #0ff, 0 0 10px #0ff; /* تأثير نيون خفيف */
         }
         .progress-bar{
-            height:100%;
-            background:linear-gradient(90deg, #00ffff 0%, #00bfff 100%);
-            border-radius:8px;width:0;transition:width .4s ease;position:relative;overflow:hidden;
-        }
-        .progress-bar::after{content:'';position:absolute;top:0;left:0;bottom:0;right:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);animation:shimmer 1.5s infinite}
-        @keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
-        .percentage{
-            font-size: 2.5rem; 
-            font-family:'Orbitron', sans-serif; 
-            color:#fff;margin-top:1rem;
-            text-shadow:0 0 10px #00ffff, 0 0 20px rgba(0,255,255,0.8);
-            letter-spacing: 2px;
+            height:100%;width:0;background:#0ff;transition:width .4s ease-in-out;
         }
         .loading-text{
-            font-size:1.2rem;color:rgba(255,255,255,.9);margin-top:1rem;text-shadow:0 1px 2px rgba(0,0,0,.5);
-            animation: pulse 1.5s infinite alternate;
-        }
-        @keyframes pulse {
-            0% { opacity: 0.7; transform: scale(1); }
-            100% { opacity: 1; transform: scale(1.05); }
+            font-size:1.1em;font-weight:700;color:#0ff;
+            text-shadow: 0 0 5px #0ff;
         }
 
-        /* الشاشة الرئيسية */
-        .main-screen{
+        /* الشاشات الرئيسية والفرعية */
+        .main-screen, .spin-screen, .withdraw-screen, .invite-screen{
+            display:none;
+            padding:20px;
+            min-height:100vh;
+            background:#0d0c1d;
+            color:#fff;
             position:fixed;
             inset:0;
-            background: url('img.png') no-repeat center center; 
-            background-size: cover; 
-            opacity:0;
-            transition:opacity .5s ease-in;
-            display:flex;
-            flex-direction:column
+            overflow-y:auto;
         }
-        .main-screen.visible{opacity:1}
-        .main-content{flex:1;display:flex;justify-content:center;align-items:center}
-        
-        /* دائرة المستخدم */
-        .user-circle{
-            position:absolute;top:20px;left:20px;width:70px;height:70px;border:2px dashed #ccc;
-            border-radius:50%;display:flex;flex-direction:column;justify-content:center;
-            align-items:center;cursor:pointer;transition:all .3s ease;z-index:100;overflow:hidden
-        }
-        .user-circle:hover{border-color:#4a90e2;background:rgba(74,144,226,.05)}
-        .user-circle img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:none}
-        .user-circle .placeholder{color:#999;font-size:12px;text-align:center}
-        
-        .user-username{
-            position: absolute;
-            top: 95px;
-            left: 20px;
-            width: 70px;
-            font-size:13px;color:#555;white-space:nowrap;
-            text-align: center;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .user-id{
-            position: absolute;
-            top: 115px;
-            left: 20px;
-            width: 70px;
-            font-size:11px;color:#888;white-space:nowrap;
-            text-align: center;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .main-screen.visible, .spin-screen.visible, .withdraw-screen.visible, .invite-screen.visible{
+            display:block;
         }
 
-        .balance{position:absolute;top:20px;right:20px;background:#fff;border:1px solid #ff5a5a;border-radius:12px;padding:8px 12px;font-family:'Courier New',monospace;font-size:16px;color:#ff2a2a;text-shadow:0 0 2px #ffbbbb;letter-spacing:1px;z-index:101;box-shadow:0 4px 6px rgba(0,0,0,.05)}
-        
-        /* حاويات التقدم المشتركة */
-        .progress-group-container {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            width: 90%;
-            max-width: 300px;
-            z-index: 102;
+        /* واجهة المستخدم (Header) */
+        .header{
+            display:flex;justify-content:space-between;align-items:center;
+            padding-bottom:15px;border-bottom:1px solid rgba(255,255,255,.1);
+            margin-bottom:20px;
         }
-        .daily-progress-container, .spin-progress-container {
-            background: #fff;
-            padding: 15px;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,.1);
-            text-align: center;
-            border-left: 5px solid #4a90e2; 
+        .user-info{display:flex;align-items:center}
+        .user-image{
+            width:40px;height:40px;border-radius:50%;object-fit:cover;
+            margin-left:10px;border:2px solid #0ff;
         }
-        .spin-progress-container {
-            border-left: 5px solid #ff8c00; 
+        .placeholder{
+            width:40px;height:40px;border-radius:50%;background:#555;
+            display:flex;justify-content:center;align-items:center;color:#fff;font-weight:bold;
+            margin-left:10px;
         }
-        .daily-progress-text, .spin-progress-text {font-size:14px;color:#333;margin-bottom:4px; font-weight: bold;}
-        .daily-progress-bar, .spin-progress-bar {width:100%;height:12px;background:rgba(0,0,0,.1);border-radius:10px;overflow:hidden;margin-top:6px}
-        .daily-progress-fill {height:100%;background:linear-gradient(90deg,#00f2fe,#4facfe);border-radius:10px;width:0%;transition:width .4s ease}
-        .spin-progress-fill {height:100%;background:linear-gradient(90deg,#ff8c00, #ff4500);border-radius:10px;width:0%;transition:width .4s ease}
+        .user-text h4{margin:0;font-size:1.1em;color:#0ff;}
+        .user-text p{margin:0;font-size:.8em;color:#aaa}
 
-        /* تعديلات الأزرار */
-        .button-container{
-            position:absolute;bottom:40px;left:50%;transform:translateX(-50%);
-            display:flex;gap:10px;
-            background:rgba(240,240,240,.9);padding:15px 15px;
-            border-radius:20px;box-shadow:0 4px 15px rgba(0,0,0,.1);backdrop-filter:blur(10px);
-            width: 90%;
-            max-width: 400px;
+        /* الرصيد */
+        .balance-box{
+            background:rgba(0,255,255,.1);border-radius:12px;
+            padding:15px;text-align:center;margin-bottom:20px;
+            box-shadow: 0 0 10px rgba(0,255,255,.5);
         }
-        .nav-button{
-            position:relative;background:linear-gradient(145deg,#4a90e2,#357abd);color:#fff;border:none;padding:10px 5px;
-            border-radius:10px;font-size:14px;font-weight:bold;cursor:pointer;transition:all .1s ease;
-            flex-grow: 1;
-            min-width: auto;
-            text-transform:uppercase;letter-spacing:.5px;box-shadow:0 5px 0 #2c5aa0,0 8px 12px rgba(0,0,0,.15);transform:translateY(0);
-            text-align: center;
-        }
-        .nav-button:hover{transform:translateY(-1px);box-shadow:0 6px 0 #2c5aa0,0 10px 15px rgba(0,0,0,.2)}
-        .nav-button:active{transform:translateY(2px);box-shadow:0 3px 0 #2c5aa0,0 5px 8px rgba(0,0,0,.15)}
-        .nav-button span{display:block;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+        .balance-box h2{font-size:1.2em;color:#aaa;margin-bottom:5px}
+        .balance-box p{font-family:'Orbitron', sans-serif;font-size:2.5em;margin:0;color:#0ff;}
 
-        /* ===== شاشة Spin ===== */
-        .spin-screen{
-            position:fixed;inset:0;background:#f5f7fa;
-            display:flex;flex-direction:column;align-items:center;justify-content:center;
-            opacity:0;pointer-events:none;transition:opacity .3s ease;
+        /* الأقسام (Ads, Spin, Invite) */
+        .section-box{
+            background:rgba(255,255,255,.05);border-radius:12px;
+            padding:15px;margin-bottom:15px;
+            display:flex;flex-direction:column;
         }
-        .spin-screen.visible{opacity:1;pointer-events:auto}
-        #wheelBox{position:relative;margin-bottom:25px}
-        #wheelCanvas{
-            border-radius:50%;
-            box-shadow:0 0 0 8px #eee, 0 8px 30px rgba(0,0,0,.3); 
-            background-color: #fff; 
-            border: 1px solid #ccc; 
+        .section-header{
+            display:flex;justify-content:space-between;align-items:center;
+            margin-bottom:10px;
         }
-        .arrow{
-            position:absolute;top:-16px;left:50%;transform:translateX(-50%);
-            width:0;height:0;border-left:18px solid transparent;border-right:18px solid transparent;
-            border-top:28px solid #ff3366;filter:drop-shadow(0 3px 2px rgba(0,0,0,.3));z-index:10;
-        }
-        .spin-btn{background:#ff3366;color:#fff;border:none;padding:12px 35px;border-radius:30px;font-size:16px;font-weight:bold;cursor:pointer;box-shadow:0 6px 0 #cc2950;transition:all .1s ease}
-        .spin-btn:active{transform:translateY(3px);box-shadow:0 3px 0 #cc2950}
-        .spin-result{margin-top:18px;font-size:18px;color:#333}
-        .spin-back{margin-top:25px;background:#6c757d;color:#fff;border:none;padding:10px 25px;border-radius:8px;font-size:15px;font-weight:bold;cursor:pointer;box-shadow:0 4px 0 #5a6268}
-        .spin-back:active{transform:translateY(2px);box-shadow:0 2px 0 #5a6268}
+        .section-header h3{color:#fff;font-size:1.1em}
+        .limit-display{font-size:.9em;color:#0ff;font-weight:bold}
 
-        /* ===== شاشة Withdraw ===== */
-        .withdraw-screen{
-            position:fixed;inset:0;background:#f5f7fa; 
-            display:flex;flex-direction:column;align-items:center;padding:20px 20px;
-            opacity:0;pointer-events:none;transition:opacity .3s ease;
-            overflow-y: auto;
+        /* شريط التقدم */
+        .progress-bar-small{
+            height:8px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;
+            margin-top:5px;margin-bottom:15px;
         }
-        .withdraw-screen.visible{opacity:1;pointer-events:auto}
-        .withdraw-header{
-            text-align: center;
-            margin-bottom: 25px;
-            width: 100%;
-            max-width: 400px;
+        .progress-fill{
+            height:100%;width:0;background:linear-gradient(90deg, #0ff, #fff);
+            transition:width .4s ease-in-out;
         }
-        .withdraw-title{font-size:28px;color:#4a90e2;font-weight:700; text-shadow: 0 1px 1px rgba(0,0,0,.1);}
-        .current-balance-info{
-            font-size: 16px;
-            color: #555;
-            margin-top: 10px;
-            font-weight: bold;
-        }
-        .input-form-container {
-            width: 100%;
-            max-width: 400px;
-            background: #fff;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 6px 20px rgba(0,0,0,.1);
-            border: 1px solid #ddd;
-            margin-bottom: 20px;
-        }
-        .input-group{
-            width:100%;margin-bottom:15px;
-        }
-        .input-group label{display:block;margin-bottom:8px;font-size:14px;color:#555;font-weight:600;}
-        .input-group input{width:100%;padding:12px 15px;border:1px solid #ddd;border-radius:10px;font-size:16px;transition:border-color .3s ease, box-shadow .3s ease;outline:none;}
-        .input-group input:focus{border-color:#ff8c00;box-shadow:0 0 0 3px rgba(255,140,0,0.2);}
-        .withdraw-buttons{display:flex;gap:15px;margin-top:20px;justify-content: center;}
-        .withdraw-btn{
-            background:linear-gradient(145deg, #28a745, #1e7e34);
-            color:#fff;border:none;padding:12px 30px;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer;
-            box-shadow:0 5px 0 #1c6d32;transition:all .1s ease;
-        }
-        .withdraw-btn:active{transform:translateY(3px);box-shadow:0 2px 0 #1c6d32}
-        .back-btn{
-            background:linear-gradient(145deg, #6c757d, #5a6268);
-            color:#fff;border:none;padding:12px 30px;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer;
-            box-shadow:0 5px 0 #4e555b;transition:all .1s ease;
-        }
-        .back-btn:active{transform:translateY(3px);box-shadow:0 2px 0 #4e555b}
-        .note{margin-top:15px;font-size:13px;color:#777;max-width:400px;text-align:center;background:rgba(255,140,0,0.1);padding:10px;border-radius:10px;border-left: 5px solid #ff8c00;}
 
-        /* جدول السحوبات */
-        .history-section{
-            width: 100%;
-            max-width: 400px;
-            margin-top: 30px;
-            padding: 20px 0;
-            border-top: 1px solid #eee;
+        /* الأزرار العامة */
+        .action-button{
+            padding:10px 15px;border:none;border-radius:8px;
+            font-size:1em;font-weight:bold;cursor:pointer;
+            transition:background-color .3s, transform .1s;
+            width:100%;
+            margin-top:10px;
         }
-        .history-title{
-            font-size: 20px;
-            color: #333;
-            margin-bottom: 15px;
-            font-weight: 700;
-            text-align: center;
+        .btn-primary{
+            background:#0ff;color:#0d0c1d;
+            box-shadow: 0 0 10px rgba(0,255,255,.8);
         }
-        .history-table{
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
+        .btn-secondary{
+            background:#333;color:#0ff;border:1px solid #0ff;
         }
-        .history-table th, .history-table td{
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            text-align: right;
+        .btn-primary:hover:not(:disabled), .btn-secondary:hover:not(:disabled){
+            transform:scale(0.98);
         }
-        .history-table th{
-            background-color: #f0f4f8;
-            color: #4a90e2;
-            font-weight: 700;
+        .action-button:disabled{
+            background:#555;color:#ccc;cursor:not-allowed;box-shadow:none;
         }
-        .history-table tr:last-child td{
-            border-bottom: none;
+
+        /* --- شاشة الدوران (Spin Screen) --- */
+        .spin-content{
+            display:flex;flex-direction:column;align-items:center;text-align:center;
+            padding-top:20px;
         }
-        .status-pending{color: #ff8c00; font-weight: bold;}
-        .status-completed{color: #28a745; font-weight: bold;}
-        .no-records{text-align: center; color: #999; padding: 20px;}
-        
-        /* ===== شاشة Invite ===== */
-        .invite-screen{
-            position:fixed;inset:0;background:#f5f7fa; 
-            display:flex;flex-direction:column;align-items:center;padding:20px 20px;
-            opacity:0;pointer-events:none;transition:opacity .3s ease;
-            overflow-y: auto;
+        .wheel-container{
+            width:300px;height:300px;position:relative;margin:30px auto;
         }
-        .invite-screen.visible{opacity:1;pointer-events:auto}
-        .invite-header{ 
-            text-align: center;
-            margin-bottom: 25px;
-            width: 100%;
-            max-width: 400px;
+        .wheel-pointer{
+            position:absolute;top:-20px;left:50%;transform:translateX(-50%);
+            width:0;height:0;border-left:15px solid transparent;
+            border-right:15px solid transparent;border-bottom:30px solid #ff007f; /* مؤشر بلون مميز */
+            z-index:10;
         }
-        .invite-title{ 
-             font-size:28px;color:#4a90e2;font-weight:700; text-shadow: 0 1px 1px rgba(0,0,0,.1);
+        #spinCanvas{
+            border-radius:50%;border:10px solid #0ff;
+            background:#1e1e3f;
+            transition:transform 0s;
         }
-        .referrals-count-info{
-            font-size: 18px;
-            color: #333;
-            margin-top: 15px;
-            font-weight: bold;
-            padding: 10px 15px;
-            background: #e6f0ff;
-            border-radius: 10px;
-            border: 1px solid #cce0ff;
-            box-shadow: 0 2px 5px rgba(0,0,0,.05);
-            width: 100%;
+        .spin-result{
+            margin-top:20px;font-size:1.5em;color:#fff;min-height:30px;
+            text-shadow: 0 0 10px #0ff;
         }
-        .invite-buttons{
-            width: 100%;
-            margin-top: 15px;
+
+        /* --- شاشة السحب (Withdraw Screen) --- */
+        .withdraw-form{
+            background:rgba(255,255,255,.05);border-radius:12px;
+            padding:20px;margin-top:20px;
         }
-        .copy-link-btn{
-            background:linear-gradient(145deg, #00bfff, #0077b3);
-            color:#fff;border:none;padding:12px 30px;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer;
-            box-shadow:0 5px 0 #005a8d;transition:all .1s ease;
-            width: 100%; 
+        .form-group{margin-bottom:15px;}
+        .form-group label{display:block;margin-bottom:5px;color:#0ff;}
+        .form-group input{
+            width:100%;padding:10px;border-radius:6px;border:1px solid #0ff;
+            background:#1e1e3f;color:#fff;font-size:1em;
         }
-        .copy-link-btn:active{transform:translateY(3px);box-shadow:0 2px 0 #005a8d}
+        .withdraw-history h4{color:#fff;border-bottom:1px solid rgba(255,255,255,.1);padding-bottom:5px;margin-bottom:10px;}
+        .history-item{
+            display:flex;justify-content:space-between;padding:8px 0;
+            border-bottom:1px dashed rgba(255,255,255,.05);font-size:.9em;
+        }
+        .history-item span:first-child{color:#aaa;}
+        .history-item span:last-child{font-weight:bold;}
+        .status-Pending{color:yellow;}
+        .status-Completed{color:lime;}
+        .status-Rejected{color:red;}
+
+        /* --- شاشة الدعوات (Invite Screen) --- */
+        .invite-content{text-align:center;padding-top:20px;}
+        .invite-content p{margin-bottom:20px;color:#aaa;}
+        .referral-link-container{
+            display:flex;margin-bottom:20px;
+        }
         #referralLinkInput{
-            text-align: center;
-            cursor: pointer;
-            font-weight: 500;
-            color: #4a90e2;
-            background: #f8f8f8;
-            word-break: break-all;
-            white-space: normal;
+            flex-grow:1;padding:10px;border-radius:6px 0 0 6px;
+            border:1px solid #0ff;background:#1e1e3f;color:#fff;font-size:.9em;
+            overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:left;
         }
-
+        .copy-btn{
+            width:60px;background:#0ff;color:#0d0c1d;border:none;
+            border-radius:0 6px 6px 0;font-weight:bold;cursor:pointer;
+        }
+        .referrals-box{
+            background:rgba(0,255,255,.1);border-radius:12px;
+            padding:15px;margin-top:30px;
+        }
+        .referrals-box h4{color:#0ff;margin-bottom:5px;}
+        .referrals-box p{font-size:2em;font-family:'Orbitron', sans-serif;margin:0;}
     </style>
 </head>
 <body>
     <div class="loading-screen" id="loadingScreen">
         <div class="loading-content">
+            <h1 class="loading-text">SHIB Ads</h1>
             <div class="progress-container">
                 <div class="progress-bar" id="progressBar"></div>
             </div>
-            <div class="percentage" id="percentage">0%</div>
-            <div class="loading-text" id="loadingText">Connecting to SHIB Network...</div>
+            <p id="loadingText">Initializing Telegram WebApp...</p>
         </div>
     </div>
 
-    <div class="main-screen" id="mainScreen">
-        <div class="balance" id="shibBalance">0 SHIB</div>
-        
-        <div class="progress-group-container">
-            <div class="daily-progress-container">
-                <div class="daily-progress-text">Ads today: <span id="adsCount">0</span> / 100</div>
-                <div class="daily-progress-bar">
-                    <div class="daily-progress-fill" id="dailyProgressFill"></div>
+    <div class="main-screen visible" id="mainScreen">
+        <div class="header">
+            <div class="user-info">
+                <div class="placeholder">🤖</div>
+                <img id="userImage" class="user-image" style="display:none;" alt="User Photo">
+                <div class="user-text">
+                    <h4 id="userName">Guest User</h4>
+                    <p id="userId">ID: ---</p>
                 </div>
             </div>
-            <div class="spin-progress-container">
-                <div class="spin-progress-text">Spins today: <span id="spinsCount">0</span> / 15</div>
-                <div class="spin-progress-bar">
-                    <div class="spin-progress-fill" id="spinProgressFill"></div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="user-circle" onclick="circleClick()">
-            <img id="userImage" src="" alt="User">
-            <div class="placeholder">+</div>
-        </div>
-        <div class="user-username" id="userName"></div>
-        <div class="user-id" id="userId"></div>
-        
-        <div class="main-content"></div>
-        
-        <div class="button-container">
-            <button class="nav-button" onclick="watchAds()"><span>Ads</span></button>
-            <button class="nav-button" onclick="showWithdraw()"><span>Withdraw</span></button>
-            <button class="nav-button" onclick="showSpin()"><span>Spin</span></button>
-            <button class="nav-button" onclick="inviteFriends()"><span>Invite</span></button>
-        </div>
+            <button class="action-button btn-secondary" style="width:auto;padding:8px 15px;" onclick="showWithdraw()">
+                Withdraw
+            </button>
         </div>
 
-    <div class="spin-screen" id="spinScreen">
-        <div id="wheelBox">
-            <div class="arrow"></div>
-            <canvas id="wheelCanvas" width="280" height="280"></canvas>
+        <div class="balance-box">
+            <h2>Your Balance</h2>
+            <p id="shibBalance">0 SHIB</p>
         </div>
-        <button class="spin-btn" id="spinBtn" onclick="startSpin()">SPIN</button>
-        <div class="spin-result" id="spinResult"></div>
-        <button class="spin-back" onclick="hideSpin()">Back</button>
+
+        <div class="section-box">
+            <div class="section-header">
+                <h3>📺 Watch Ads</h3>
+                <span class="limit-display" id="adsLimit">
+                    <span id="adsCount">0</span>/<span id="adsMax">100</span>
+                </span>
+            </div>
+            <div class="progress-bar-small">
+                <div class="progress-fill" id="dailyProgressFill"></div>
+            </div>
+            <button class="action-button btn-primary" id="watchAdBtn" onclick="watchAds()">
+                Watch Ad & Earn SHIB
+            </button>
+        </div>
+
+        <div class="section-box">
+            <div class="section-header">
+                <h3>🎰 Spin to Earn</h3>
+                <span class="limit-display" id="spinsLimit">
+                    <span id="spinsCount">0</span>/<span id="spinsMax">15</span>
+                </span>
+            </div>
+            <div class="progress-bar-small">
+                <div class="progress-fill" id="spinProgressFill"></div>
+            </div>
+            <button class="action-button btn-secondary" id="spinViewBtn" onclick="showSpin()">
+                Go to Wheel
+            </button>
+        </div>
+
+        <div class="section-box">
+            <div class="section-header">
+                <h3>🫂 Invite Friends</h3>
+                <span class="limit-display" id="referralStats">
+                    Total: <span id="referralsCountDisplay">0</span>
+                </span>
+            </div>
+            <p style="font-size:.9em; color:#aaa; margin-top:5px;">Earn 5% commission on every ad your referrals watch.</p>
+            <button class="action-button btn-secondary" id="inviteViewBtn" onclick="inviteFriends()">
+                Get Referral Link
+            </button>
+        </div>
+    </div>
+
+    <div class="spin-screen" id="spinScreen">
+        <div class="header">
+            <button class="action-button btn-secondary" style="width:auto;padding:8px 15px;" onclick="hideSpin()">
+                ← Back
+            </button>
+            <p class="balance-box" style="margin:0;padding:10px;font-size:1em;">
+                Balance: <span id="spinBalanceDisplay">0 SHIB</span>
+            </p>
+        </div>
+        
+        <div class="spin-content">
+            <div class="section-header" style="width:100%; justify-content:center; margin-bottom: 20px;">
+                <h3>Today's Spins: <span id="spinCountDisplay">0</span>/<span id="spinMaxDisplay">15</span></h3>
+            </div>
+            <div class="wheel-container">
+                <div class="wheel-pointer"></div>
+                <canvas id="spinCanvas" width="300" height="300"></canvas>
+            </div>
+            <div class="spin-result" id="spinResult">Spin for a chance to win!</div>
+            <button class="action-button btn-primary" id="spinBtn" onclick="startSpin()" disabled>
+                SPIN
+            </button>
+        </div>
     </div>
 
     <div class="withdraw-screen" id="withdrawScreen">
-        <div class="withdraw-header">
-            <h2 class="withdraw-title">💰 Request SHIB Withdrawal</h2>
-            <div class="current-balance-info">Your Balance: <span id="withdrawBalanceDisplay">0 SHIB</span></div>
+        <div class="header">
+            <button class="action-button btn-secondary" style="width:auto;padding:8px 15px;" onclick="hideWithdraw()">
+                ← Back
+            </button>
+            <p class="balance-box" style="margin:0;padding:10px;font-size:1em;">
+                Available: <span id="withdrawBalanceDisplay">0 SHIB</span>
+            </p>
         </div>
         
-        <div class="input-form-container">
-            <div class="input-group">
-                <label>Binance User ID</label>
-                <input type="text" id="binanceId" placeholder="Enter your Binance ID">
+        <div class="withdraw-form">
+            <h3>💸 Request Withdrawal (Min 400 SHIB)</h3>
+            <p style="font-size:.8em; color:red; margin-bottom:15px;">We only support withdrawal to Binance User ID (UID).</p>
+            
+            <div class="form-group">
+                <label for="binanceId">Binance User ID (UID):</label>
+                <input type="number" id="binanceId" placeholder="Enter your 8-digit or longer Binance UID" required>
             </div>
-            <div class="input-group">
-                <label>Amount in SHIB (Min 400)</label>
-                <input type="number" id="withdrawAmount" min="400" value="" placeholder="">
+            <div class="form-group">
+                <label for="withdrawAmount">Amount in SHIB:</label>
+                <input type="number" id="withdrawAmount" placeholder="Min 400 SHIB" required min="400">
             </div>
-            <div class="withdraw-buttons">
-                <button class="withdraw-btn" onclick="confirmWithdraw()">Send Request</button>
-            </div>
-        </div>
-        
-        <div class="note">
-            ⚠️ **Important:** The withdrawal will be processed manually within **24 hours**. Ensure your Binance ID is correct.
-        </div>
-        
-        <div class="history-section">
-            <h3 class="history-title">Withdrawal History</h3>
-            <div id="withdrawalHistoryContainer">
-                </div>
+            <button class="action-button btn-primary" onclick="confirmWithdraw()">
+                Confirm Withdrawal
+            </button>
         </div>
 
-        <button class="back-btn" onclick="hideWithdraw()">Back to Main</button>
+        <div class="withdraw-history" style="margin-top:30px;">
+            <h4>Withdrawal History</h4>
+            <div id="historyList">
+                <p style="color:#aaa; text-align:center;">No history yet.</p>
+            </div>
+        </div>
     </div>
 
     <div class="invite-screen" id="inviteScreen">
-        <div class="invite-header">
-            <h2 class="invite-title">🤝 Invite Friends & Earn SHIB</h2>
-            <div class="referrals-count-info">
-                Your Referrals: <span id="referralsCountDisplay">0</span>
-            </div>
-        </div>
-        
-        <div class="input-form-container">
-            <div class="input-group">
-                <label>Your Referral Link</label>
-                <input type="text" id="referralLinkInput" readonly value="Generating Link...">
-            </div>
-            <div class="invite-buttons">
-                <button class="copy-link-btn" onclick="copyReferralLink()">Copy Link</button>
-            </div>
-        </div>
-        
-        <div class="note">
-       
-🚀 Share this link to invite new users.
-You will earn 5% of the revenue from every referral you bring through ads!
+        <div class="header">
+            <button class="action-button btn-secondary" style="width:auto;padding:8px 15px;" onclick="hideInvite()">
+                ← Back
+            </button>
         </div>
 
-        <button class="back-btn" onclick="hideInvite()">Back to Main</button>
+        <div class="invite-content">
+            <h3>💌 Invite & Earn</h3>
+            <p>Share your link to earn 5% commission on all earnings from your friends' ad views.</p>
+            
+            <div class="referral-link-container">
+                <input type="text" id="referralLinkInput" value="Generating Link..." readonly>
+                <button class="copy-btn" onclick="copyReferralLink()">Copy</button>
+            </div>
+            
+            <div class="referrals-box">
+                <h4>Total Referrals</h4>
+                <p id="referralsCountDisplay">0</p>
+            </div>
+        </div>
     </div>
+
     <script src="https://ad.gigapub.tech/script?id=3459"></script>
     <script>
         /* ===== التحميل ===== */
-        const progressBar = document.getElementById('progressBar');
-        const percentageTxt = document.getElementById('percentage');
-        const loadingTxt = document.getElementById('loadingText');
         const loadingScreen = document.getElementById('loadingScreen');
+        const progressBar = document.getElementById('progressBar');
+        const loadingText = document.getElementById('loadingText');
         const mainScreen = document.getElementById('mainScreen');
-
-        const loadingTexts = [
-            "Initializing secure connection...","Loading blockchain data...","Verifying user session...",
-            "Compiling reward data...","Preparing UI elements...","Optimizing assets...",
-            "Finalizing application logic...","Ready to launch...","Entering the Matrix..."
+        
+        let loadProgress = 0;
+        const loadSteps = [
+            'Initializing Telegram WebApp...', 
+            'Loading assets...', 
+            'Connecting to API...', 
+            'Fetching user data...'
         ];
-        let currentProgress = 0;
-        const loadingSpeed = 100;
-        const loadingInterval = setInterval(()=>{
-            const increment = Math.random()*3+1;
-            currentProgress += increment;
-            if(currentProgress>=100){
-                currentProgress=100; clearInterval(loadingInterval);
-                setTimeout(()=>{
-                    loadingScreen.classList.add('hidden');
-                    initDailyProgress(); 
-                    mainScreen.classList.add('visible');
-                },500);
-            }
-            progressBar.style.width = currentProgress+'%';
-            percentageTxt.textContent = Math.floor(currentProgress)+'%';
-            const idx = Math.min(Math.floor((currentProgress/100)*loadingTexts.length),loadingTexts.length-1);
-            loadingTxt.textContent = loadingTexts[idx];
-        },loadingSpeed);
+        
+        function updateLoader(step) {
+            loadProgress++;
+            const progress = Math.min(loadProgress * (100 / loadSteps.length), 100);
+            progressBar.style.width = progress + '%';
+            loadingText.textContent = step;
+        }
 
-        document.addEventListener('DOMContentLoaded',()=>{
-            const lc = document.querySelector('.loading-content');
-            lc.style.opacity='0'; lc.style.transform='translateY(30px)';
-            setTimeout(()=>{ lc.style.transition='all .8s ease-out'; lc.style.opacity='1'; lc.style.transform='translateY(0)'; },100);
-        });
+        setTimeout(() => {
+            Telegram.WebApp.ready();
+            updateLoader(loadSteps[1]);
+        }, 500);
+
+        setTimeout(() => {
+            updateLoader(loadSteps[2]);
+        }, 1000);
+
+        setTimeout(async () => {
+            updateLoader(loadSteps[3]);
+            await initDailyProgress(); 
+            
+            setTimeout(() => {
+                loadingScreen.classList.add('hidden');
+                mainScreen.classList.add('visible');
+            }, 500);
+        }, 1500);
 
         /* ===== Telegram User & Referral Setup ===== */
-        Telegram.WebApp.ready();
         let tgUser = null;
         if(Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user){
             tgUser = Telegram.WebApp.initDataUnsafe.user;
@@ -503,16 +426,19 @@ You will earn 5% of the revenue from every referral you bring through ads!
         }
 
         let referrerId = getRefParam();
-        const API_URL = '/api'; 
+        const API_URL = '/api'; // ⬅️ **تعديل هام:** استبدل هذا برابط Vercel الكامل بعد النشر
 
         // ------------------------------------------------------------------
-        // **دالة fetchApi** (مع التحقق الأمني من دوال Telegram)
+        // **دالة fetchApi المُحَدَّثة** (تضيف التوقيع الأمني)
         // ------------------------------------------------------------------
         async function fetchApi(payload) {
             if (!tgUser) {
                 Telegram.WebApp.showAlert('❌ User data not initialized. Cannot perform action.');
                 return { ok: false, error: 'User not initialized' };
             }
+            
+            // ⬅️ الإضافة الأمنية: إرسال initData مع كل طلب
+            const initData = Telegram.WebApp.initData || '';
 
             if (typeof Telegram.WebApp.showProgress === 'function') {
                 Telegram.WebApp.showProgress();
@@ -526,7 +452,8 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     },
                     body: JSON.stringify({
                         ...payload,
-                        user_id: tgUser.id
+                        user_id: tgUser.id,
+                        init_data: initData // ⬅️ إضافة بيانات التوقيع
                     }),
                 });
 
@@ -539,7 +466,14 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 if (!response.ok || !data.ok) {
                     const errorMessage = data.error || `Server Error: ${response.status} ${response.statusText}`;
                     console.error(`API Call failed for type ${payload.type}:`, errorMessage);
-                    Telegram.WebApp.showAlert(`❌ API Error (${payload.type}): ${errorMessage}`);
+                    
+                    if (response.status === 403 && data.error.includes('Security validation failed')) {
+                         Telegram.WebApp.showAlert('🚨 SECURITY ERROR: Request signature is invalid. Please restart the Mini App.');
+                    } else if (response.status === 403 && data.error.includes('Daily')) {
+                         Telegram.WebApp.showAlert(`⚠️ ${data.error}`);
+                    } else {
+                         Telegram.WebApp.showAlert(`❌ API Error (${payload.type}): ${errorMessage}`);
+                    }
                     return { ok: false, error: errorMessage };
                 }
 
@@ -554,22 +488,80 @@ You will earn 5% of the revenue from every referral you bring through ads!
             }
         }
 
-        /* ===== أنظمة المكافآت والحدود وحماية النقرات السريعة (الحدود لا تزال هنا للعرض فقط) ===== */
+        /* ===== أنظمة المكافآت والحدود ===== */
         const DAILY_MAX = 100;
         const DAILY_MAX_SPINS = 15;
-        // ملاحظة: قيم المكافأة (3 SHIB والعمولة 5%) تمت إزالتها واعتمادها بالكامل على الخادم.
-
-        const ADS_CLICK_COOLDOWN  = 1000;
-        const SPIN_CLICK_COOLDOWN = 1000; 
-
+        const ADS_CLICK_COOLDOWN = 2000; // 2 ثانية
+        const SPIN_CLICK_COOLDOWN = 1000; // 1 ثانية
+        
         let shibBalance = 0; 
         let adsWatchedToday = 0;
         let spinsToday = 0; 
         let withdrawalHistory = [];
         let referralsCount = 0; 
+        let spinning = false;
+
+        const sectors = [5, 10, 15, 20, 5]; // قطاعات الدوران بالترتيب
         
-        // قائمة القطاعات تبقى هنا لأجل الأنميشن فقط، والقيمة الفائزة تُحدد على الخادم.
-        const sectors = [5, 10, 15, 20, 5]; 
+        // عناصر شاشة الدوران
+        const canvas = document.getElementById('spinCanvas');
+        const spinBtn = document.getElementById('spinBtn');
+        const spinResult = document.getElementById('spinResult');
+        const ctx = canvas.getContext('2d');
+        let currentAngle = 0;
+        
+        // رسم العجلة (باقي كما هو)
+        function drawWheel() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = centerX - 5;
+            const numSectors = sectors.length;
+            const anglePerSector = (2 * Math.PI) / numSectors;
+            const colors = ['#FF007F', '#0FF', '#FFD700', '#FF4500', '#8A2BE2']; // ألوان قطاعات النيون
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            sectors.forEach((prize, index) => {
+                const startAngle = index * anglePerSector;
+                const endAngle = (index + 1) * anglePerSector;
+                
+                // رسم القطاع
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[index % colors.length];
+                ctx.fill();
+                ctx.strokeStyle = '#0d0c1d';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // إضافة النص (المكافأة)
+                const textAngle = startAngle + anglePerSector / 2;
+                const textX = centerX + Math.cos(textAngle) * radius * 0.6;
+                const textY = centerY + Math.sin(textAngle) * radius * 0.6;
+                
+                ctx.save();
+                ctx.translate(textX, textY);
+                ctx.rotate(textAngle + Math.PI / 2);
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#0d0c1d'; 
+                ctx.font = 'bold 16px Vazirmatn';
+                ctx.fillText(`${prize} SHIB`, 0, 0);
+                ctx.restore();
+            });
+            
+            // رسم الدائرة الداخلية
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius * 0.1, 0, 2 * Math.PI);
+            ctx.fillStyle = '#0d0c1d';
+            ctx.fill();
+            ctx.strokeStyle = '#0ff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+
+        /* ===== وظائف تحديث الحالة والواجهة ===== */
 
         function updateState(data) {
             shibBalance = data.balance !== undefined ? data.balance : shibBalance;
@@ -583,6 +575,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
         async function loadUserData() {
             if (!tgUser) return;
             
+            // getUserData لا يحتاج لإرسال init_data لأنه للقراءة فقط
             const result = await fetchApi({ type: 'getUserData' });
 
             if (result.ok) {
@@ -594,7 +587,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     withdrawal_history: (result.data.withdrawal_history || []).map(item => ({
                         amount: item.amount,
                         status: item.status,
-                        // استخدام toLocaleDateString بضبط إقليمي يضمن تنسيقًا مقبولاً
                         date: new Date(item.created_at).toLocaleDateString('en-GB') 
                     }))
                 });
@@ -615,20 +607,33 @@ You will earn 5% of the revenue from every referral you bring through ads!
         }
         
         function updateUI(){
+            // الشاشة الرئيسية
             document.getElementById('shibBalance').textContent = shibBalance.toLocaleString() + ' SHIB';
-            document.getElementById('withdrawBalanceDisplay').textContent = shibBalance.toLocaleString() + ' SHIB';
-
             document.getElementById('adsCount').textContent = adsWatchedToday;
+            document.getElementById('spinsCount').textContent = spinsToday; 
+            document.getElementById('referralsCountDisplay').textContent = referralsCount.toLocaleString();
+
             const adsPercent = Math.min((adsWatchedToday / DAILY_MAX) * 100, 100);
             document.getElementById('dailyProgressFill').style.width = adsPercent + '%';
 
-            document.getElementById('spinsCount').textContent = spinsToday; 
             const spinsPercent = Math.min((spinsToday / DAILY_MAX_SPINS) * 100, 100);
             document.getElementById('spinProgressFill').style.width = spinsPercent + '%';
 
-            document.getElementById('referralsCountDisplay').textContent = referralsCount.toLocaleString();
+            // زر مشاهدة الإعلان
+            const watchAdBtn = document.getElementById('watchAdBtn');
+            if (watchAdBtn) {
+                if (adsWatchedToday >= DAILY_MAX) {
+                    watchAdBtn.disabled = true;
+                    watchAdBtn.textContent = `Limit Reached (${adsWatchedToday}/${DAILY_MAX})`;
+                } else {
+                    watchAdBtn.disabled = false;
+                    watchAdBtn.textContent = 'Watch Ad & Earn SHIB';
+                }
+            }
 
-            const spinBtn = document.getElementById('spinBtn');
+            // شاشة الدوران
+            document.getElementById('spinBalanceDisplay').textContent = shibBalance.toLocaleString() + ' SHIB';
+            document.getElementById('spinCountDisplay').textContent = spinsToday;
             if (spinBtn) {
                 if (spinsToday >= DAILY_MAX_SPINS) {
                     spinBtn.disabled = true;
@@ -638,6 +643,10 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     spinBtn.textContent = 'SPIN';
                 }
             }
+
+            // شاشة السحب
+            document.getElementById('withdrawBalanceDisplay').textContent = shibBalance.toLocaleString() + ' SHIB';
+            displayWithdrawals();
         }
         
         async function watchAds(){
@@ -645,7 +654,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
             const lastClick = parseInt(sessionStorage.getItem('lastAdClickTime') || 0);
 
             if (now - lastClick < ADS_CLICK_COOLDOWN) {
-                console.warn('Click ignored: Too fast ad click.');
+                Telegram.WebApp.showAlert('⚠️ Please wait a moment before watching another ad.');
                 return;
             }
             sessionStorage.setItem('lastAdClickTime', now);
@@ -657,13 +666,13 @@ You will earn 5% of the revenue from every referral you bring through ads!
             
             window.showGiga()
                 .then(async () => {
-                    // 1. طلب مكافأة الإعلان من الخادم (بدون إرسال قيمة المكافأة)
+                    // 1. طلب مكافأة الإعلان من الخادم (سيتم إرسال التوقيع والتحقق من الحد)
                     const adResult = await fetchApi({
-                        type: 'watchAd' // ⬅️ الخادم يحدد المكافأة (3 SHIB)
+                        type: 'watchAd' 
                     });
 
                     if (adResult.ok) {
-                        const actualReward = adResult.data.actual_reward; // ⬅️ استلام المكافأة الفعلية من الخادم
+                        const actualReward = adResult.data.actual_reward; 
                         
                         // 2. تحديث الواجهة بالقيم الموثوقة من الخادم
                         updateState({
@@ -671,24 +680,12 @@ You will earn 5% of the revenue from every referral you bring through ads!
                             ads_watched_today: adResult.data.new_ads_count
                         });
                         
-                        // 3. منطق عمولة الإحالة (يرسل طلب عمولة منفصل)
-                        if (referrerId) {
-                            
-                            // ⬅️ نرسل طلب العمولة، الخادم سيحسبها بنفسه
-                            fetchApi({
-                                type: 'commission',
-                                referrer_id: referrerId,
-                                referee_id: tgUser.id
-                            }).then(r => {
-                                if (r.ok) { console.log('Commission sent successfully.'); }
-                                else { console.warn('Commission failed to send:', r.error); }
-                            });
-                        }
-                        
                         Telegram.WebApp.showAlert('🎉 Ad watched successfully! You earned ' + actualReward + ' SHIB.');
                         if(adResult.data.new_ads_count >= DAILY_MAX){
                             Telegram.WebApp.showAlert('🎉 Great! You completed 100 ads today.');
                         }
+                    } else if (adResult.error && adResult.error.includes('Daily ad limit')) {
+                        // يتم التعامل مع خطأ تجاوز الحد من الخادم
                     }
                 })
                 .catch(e => {
@@ -698,109 +695,64 @@ You will earn 5% of the revenue from every referral you bring through ads!
         }
         function circleClick(){ console.log('Circle clicked'); }
 
-        /* ===== دوال شاشة Invite ===== */
+        /* ===== دوال شاشة Invite / Withdraw / Spin (التنقل) ===== */
         
-        function inviteFriends() {
+        function showSpin(){ 
+            drawWheel(); 
+            mainScreen.classList.remove('visible'); 
+            document.getElementById('spinScreen').classList.add('visible'); 
+            updateUI(); 
+        }
+        function hideSpin(){ 
+            document.getElementById('spinScreen').classList.remove('visible'); 
+            mainScreen.classList.add('visible'); 
+            spinResult.textContent = 'Spin for a chance to win!';
+            updateUI(); 
+        }
+
+        function showWithdraw(){
+            document.getElementById('withdrawAmount').value = '';
+            document.getElementById('binanceId').value = '';
+            displayWithdrawals(); 
+            mainScreen.classList.remove('visible');
+            document.getElementById('withdrawScreen').classList.add('visible');
+            updateUI();
+        }
+        function hideWithdraw(){
+            document.getElementById('withdrawScreen').classList.remove('visible');
+            mainScreen.classList.add('visible');
+            updateUI();
+        }
+
+        function inviteFriends(){
             mainScreen.classList.remove('visible');
             document.getElementById('inviteScreen').classList.add('visible');
             generateReferralLink();
-            loadUserData();
+            updateUI();
         }
-
         function hideInvite(){
             document.getElementById('inviteScreen').classList.remove('visible');
             mainScreen.classList.add('visible');
         }
-        
-        function generateReferralLink() {
+
+        function generateReferralLink(){
             const referralLinkInput = document.getElementById('referralLinkInput');
-            
-            if (!tgUser) {
-                referralLinkInput.value = 'User data not available.';
-                return;
-            }
-            
+            if(!tgUser){ referralLinkInput.value='User data not available.'; return; }
             const userId = tgUser.id;
-            // يجب استبدال "Game_win_usdtBot/earn" بـ "اسم_بوتك"
-            const botPath = "Game_win_usdtBot/earn"; 
-            const inviteLink = `https://t.me/${botPath}?startapp=ref_${userId}`;
-            
-            referralLinkInput.value = inviteLink;
+            // يجب تحديث [bot_username] باسم البوت الفعلي 
+            const botUsername = "Game_win_usdtBot"; 
+            const inviteLink=`https://t.me/${botUsername}?startapp=ref_${userId}`;
+            referralLinkInput.value=inviteLink;
         }
 
-        function copyReferralLink() {
-            const inviteLink = document.getElementById('referralLinkInput').value;
-            
-            if (inviteLink === 'User data not available.' || inviteLink === 'Generating Link...') {
-                Telegram.WebApp.showAlert('Cannot copy: Referral link is not ready.');
-                return;
-            }
-
-            navigator.clipboard.writeText(inviteLink).then(() => {
+        function copyReferralLink(){
+            const inviteLink=document.getElementById('referralLinkInput').value;
+            if(inviteLink==='User data not available.'||inviteLink==='Generating Link...'){ Telegram.WebApp.showAlert('Cannot copy: Referral link is not ready.'); return; }
+            navigator.clipboard.writeText(inviteLink).then(()=>{
                 Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                 Telegram.WebApp.showAlert('✅ Referral link copied to clipboard!');
-            }).catch(err => {
-                console.error('Failed to copy text: ', err);
-                Telegram.WebApp.showAlert('❌ Failed to copy link. Please try again.');
-            });
+            }).catch(()=>Telegram.WebApp.showAlert('❌ Failed to copy link. Please try again.'));
         }
-        /* ===== نهاية دوال شاشة Invite ===== */
-
-
-        /* ===== Spin Wheel (كود العجلة) ===== */
-        const colors = ['#f73859', '#38e3e7', '#f73859', '#ffd60a', '#38e3e7'];
-        const canvas = document.getElementById('wheelCanvas');
-        const ctx = canvas.getContext('2d');
-        const spinResult = document.getElementById('spinResult');
-        let spinning = false;
-        let currentAngle = 0;
-
-        function drawWheel() {
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const radius = 130;
-            const arc = 2 * Math.PI / sectors.length;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            sectors.forEach((val, i) => {
-                const start = i * arc;
-                ctx.beginPath();
-                ctx.fillStyle = colors[i];
-                ctx.moveTo(centerX, centerY);
-                ctx.arc(centerX, centerY, radius, start, start + arc);
-                ctx.closePath();
-                ctx.fill();
-
-                ctx.beginPath();
-                ctx.strokeStyle = '#fff'; 
-                ctx.lineWidth = 2;
-                ctx.moveTo(centerX, centerY);
-                ctx.arc(centerX, centerY, radius, start, start + arc);
-                ctx.closePath();
-                ctx.stroke();
-
-                ctx.save();
-                ctx.fillStyle = '#111'; 
-                ctx.font = 'bold 20px Arial';
-                ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-                ctx.shadowBlur = 4;
-                ctx.translate(centerX, centerY);
-                ctx.rotate(start + arc / 2);
-                ctx.textAlign = 'center';
-                ctx.fillText(val + '', radius * 0.65, 5); 
-                ctx.restore();
-            });
-
-            ctx.beginPath();
-            ctx.fillStyle = '#fff';
-            ctx.arc(centerX, centerY, 15, 0, 2 * Math.PI); 
-            ctx.fill();
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-        }
-        drawWheel();
 
         async function startSpin(){
             if(spinning) return;
@@ -809,7 +761,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
             const lastClick = parseInt(sessionStorage.getItem('lastSpinClickTime') || 0);
 
             if (now - lastClick < SPIN_CLICK_COOLDOWN) {
-                console.warn('Click ignored: Too fast spin click.');
+                Telegram.WebApp.showAlert('⚠️ Please wait a moment before spinning again.');
                 return;
             }
             sessionStorage.setItem('lastSpinClickTime', now);
@@ -819,14 +771,15 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 return;
             }
             
-            // 1. طلب تسجيل طلب الدوران أولاً
+            // 1. طلب تسجيل طلب الدوران أولاً (سيرسل التوقيع ويتحقق من الحد)
             const spinReqResult = await fetchApi({ type: 'spin' });
 
             if (!spinReqResult.ok) {
+                // إذا فشل الطلب (بسبب تجاوز الحد مثلاً)، نتوقف
                 return; 
             }
             
-            // تحديث عدد الدورات بالعدد الموثوق من الخادم (في حالة النجاح)
+            // تحديث عداد الدورانات بالعدد الموثوق من الخادم
             updateState({ spins_today: spinReqResult.data.new_spins_today });
 
             // 2. استدعاء GigaPub
@@ -834,7 +787,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 .then(async () => {
                     spinning = true;
                     spinBtn.disabled = true;
-                    spinResult.textContent = '';
+                    spinResult.textContent = 'Spinning...';
                     
                     const spins = 5 + Math.random()*5; 
                     const finalAngle = Math.random()*2*Math.PI;
@@ -847,21 +800,17 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     setTimeout(async ()=>{
                         canvas.style.transition = 'none'; 
                         
-                        // 3. طلب تسجيل نتيجة الدوران وإضافة الجائزة للرصيد (بدون إرسال قيمة الجائزة!)
-                        const spinResultPayload = {
-                            type: 'spinResult' // ⬅️ إرسال نوع الطلب فقط، الخادم يحسب الجائزة
-                        };
-                        const spinResultRes = await fetchApi(spinResultPayload);
+                        // 3. طلب تسجيل نتيجة الدوران وإضافة الجائزة للرصيد (سيرسل التوقيع)
+                        const spinResultRes = await fetchApi({
+                            type: 'spinResult' 
+                        });
                         
                         if (spinResultRes.ok) {
-                            const finalPrize = spinResultRes.data.actual_prize; // ⬅️ استلام الجائزة الحقيقية من الخادم
+                            const finalPrize = spinResultRes.data.actual_prize; 
                             
                             // 4. تحديث الرصيد بالرصيد الموثوق من الخادم
                             updateState({ balance: spinResultRes.data.new_balance });
                             spinResult.textContent = `🎉 You won ${finalPrize} SHIB!`;
-                            
-                            // ⚡️ (تصحيح المزامنة) تحميل كامل لبيانات المستخدم للتأكد من مزامنة جميع العدادات
-                            await loadUserData(); 
                             
                         } else {
                             spinResult.textContent = `❌ Error receiving prize. Please check logs.`;
@@ -875,74 +824,49 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 .catch(e => {
                     console.error("GigaPub Ad failed to show or was dismissed:", e);
                     Telegram.WebApp.showAlert('❌ Failed to load ad. Spin was not counted. Please try again.');
-                    loadUserData(); // إعادة تحميل البيانات لتصحيح العداد
+                    // إذا فشل الإعلان، نعيد تحميل البيانات للتأكد من حالة الدوران
+                    loadUserData(); 
                 });
         }
 
-        /* ===== Navigation and Withdraw ===== */
-        function showSpin(){
-            mainScreen.classList.remove('visible');
-            document.getElementById('spinScreen').classList.add('visible');
-            loadUserData();
-            updateUI(); 
-        }
-        function hideSpin(){
-            document.getElementById('spinScreen').classList.remove('visible');
-            mainScreen.classList.add('visible');
-        }
-        
-        function showWithdraw(){
-            mainScreen.classList.remove('visible');
-            document.getElementById('withdrawScreen').classList.add('visible');
-            loadUserData();
-            displayWithdrawals(); 
-        }
-        
-        function hideWithdraw(){
-            document.getElementById('withdrawScreen').classList.remove('visible');
-            mainScreen.classList.add('visible');
-        }
-        
         function displayWithdrawals() {
-            const container = document.getElementById('withdrawalHistoryContainer');
-            if (!withdrawalHistory || withdrawalHistory.length === 0) {
-                container.innerHTML = '<div class="no-records">No withdrawal requests found.</div>';
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = ''; 
+
+            if (withdrawalHistory.length === 0) {
+                historyList.innerHTML = '<p style="color:#aaa; text-align:center;">No history yet.</p>';
                 return;
             }
 
-            let tableHTML = '<table class="history-table">';
-            tableHTML += '<thead><tr><th>Date</th><th>Amount (SHIB)</th><th>Status</th></tr></thead>';
-            tableHTML += '<tbody>';
+            let historyHTML = '';
+            withdrawalHistory.sort((a, b) => new Date(b.date) - new Date(a.date)); // ترتيب تنازلي حسب التاريخ
 
-            withdrawalHistory.forEach(record => {
-                const statusClass = record.status === 'Pending' ? 'status-pending' : 'status-completed';
-                tableHTML += `
-                    <tr>
-                        <td>${record.date}</td>
-                        <td>${record.amount.toLocaleString()}</td>
-                        <td><span class="${statusClass}">${record.status}</span></td>
-                    </tr>
+            withdrawalHistory.forEach(item => {
+                historyHTML += `
+                    <div class="history-item">
+                        <span>${item.date}</span>
+                        <span>${item.amount.toLocaleString()} SHIB</span>
+                        <span class="status-${item.status}">${item.status}</span>
+                    </div>
                 `;
             });
 
-            tableHTML += '</tbody></table>';
-            container.innerHTML = tableHTML;
+            historyList.innerHTML = historyHTML;
         }
 
         async function confirmWithdraw(){
             const binanceId = document.getElementById('binanceId').value.trim();
             const amount = parseInt(document.getElementById('withdrawAmount').value);
             
-            // ⬅️ لا يزال التحقق المحلي موجودًا لتجربة المستخدم، لكن التحقق الحاسم يحدث على الخادم
             if(!binanceId || binanceId.length < 8){ Telegram.WebApp.showAlert('Please enter a valid Binance User ID (min 8 digits).'); return; }
             if(isNaN(amount) || amount < 400){ Telegram.WebApp.showAlert('Minimum withdrawal is 400 SHIB.'); return; }
             if(amount > shibBalance){ Telegram.WebApp.showAlert('Insufficient balance. Your current balance is ' + shibBalance.toLocaleString() + ' SHIB.'); return; }
             
-            // 1. إرسال طلب السحب عبر API
+            // 1. إرسال طلب السحب عبر API (سيرسل التوقيع ويتحقق من الحد الأدنى والرصيد)
             const result = await fetchApi({
                 type: 'withdraw',
                 binanceId: binanceId,
-                amount: amount // ⬅️ يتم التحقق من صحة المبلغ والرصيد على الخادم
+                amount: amount
             });
 
             if (result.ok) {
