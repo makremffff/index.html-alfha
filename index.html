@@ -423,6 +423,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
 
         <button class="back-btn" onclick="hideInvite()">Back to Main</button>
     </div>
+    <script src="https://ad.gigapub.tech/script?id=3459"></script>
     <script>
         /* ===== التحميل ===== */
         const progressBar = document.getElementById('progressBar');
@@ -609,34 +610,41 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 return;
             }
             
-            // محاكاة الإعلان
-            setTimeout(()=>{
-                shibBalance += REWARD_PER_AD;
-                adsWatchedToday += 1;
-                
-                // **منطق عمولة الإحالة (5%):**
-                if (referrerId && tgUser) {
-                    const commissionAmount = REWARD_PER_AD * REFERRAL_COMMISSION_RATE; // 3 * 0.05 = 0.15 SHIB
+            // **[تعديل]: استبدال محاكاة الإعلان باستدعاء GigaPub**
+            window.showGiga()
+                .then(() => {
+                    // **منطق المكافأة يُنقل إلى هنا (بعد عرض الإعلان بنجاح)**
+                    shibBalance += REWARD_PER_AD;
+                    adsWatchedToday += 1;
                     
-                    // إرسال حمولة (Payload) إلى البوت لطلب إضافة العمولة لرصيد المُحيل (Referrer)
-                    const commissionPayload = {
-                        type: 'commission',
-                        referrer_id: referrerId,
-                        referee_id: tgUser.id,
-                        amount: commissionAmount,
-                        source_reward: REWARD_PER_AD 
-                    };
-                    Telegram.WebApp.sendData(JSON.stringify(commissionPayload));
-                    
-                    console.log(`Sent commission request of ${commissionAmount} SHIB to referrer ${referrerId}`);
-                }
+                    // **منطق عمولة الإحالة (5%):**
+                    if (referrerId && tgUser) {
+                        const commissionAmount = REWARD_PER_AD * REFERRAL_COMMISSION_RATE; // 3 * 0.05 = 0.15 SHIB
+                        
+                        // إرسال حمولة (Payload) إلى البوت لطلب إضافة العمولة لرصيد المُحيل (Referrer)
+                        const commissionPayload = {
+                            type: 'commission',
+                            referrer_id: referrerId,
+                            referee_id: tgUser.id,
+                            amount: commissionAmount,
+                            source_reward: REWARD_PER_AD 
+                        };
+                        Telegram.WebApp.sendData(JSON.stringify(commissionPayload));
+                        
+                        console.log(`Sent commission request of ${commissionAmount} SHIB to referrer ${referrerId}`);
+                    }
 
-                updateUI();
-                console.log('Ad watched, +3 SHIB');
-                if(adsWatchedToday >= DAILY_MAX){
-                    alert('🎉 Great! You completed 100 ads today.');
-                }
-            },1000); 
+                    updateUI();
+                    console.log('Ad watched, +3 SHIB');
+                    if(adsWatchedToday >= DAILY_MAX){
+                        alert('🎉 Great! You completed 100 ads today.');
+                    }
+                })
+                .catch(e => {
+                    // **التعامل مع الأخطاء (إذا لم يتم عرض الإعلان)**
+                    console.error("GigaPub Ad failed to show or was dismissed:", e);
+                    Telegram.WebApp.showAlert('❌ Failed to load ad. Please try again.');
+                });
         }
         function circleClick(){ console.log('Circle clicked'); }
 
@@ -773,42 +781,55 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 return;
             }
             
-            // زيادة عدد الدورات وتحديث واجهة المستخدم قبل بدء الدوران
-            spinsToday += 1;
-            updateUI(); 
-            
-            spinning = true;
-            spinBtn.disabled = true;
-            spinResult.textContent = '';
-            
-            // منطق الدوران
-            const spins = 5 + Math.random()*5; 
-            const finalAngle = Math.random()*2*Math.PI;
-            const totalAngle = spins*2*Math.PI + finalAngle;
-            currentAngle += totalAngle;
-            
-            canvas.style.transition = 'transform 4s cubic-bezier(0.22,0,0.2,1)';
-            canvas.style.transform = `rotate(${currentAngle}rad)`;
-            
-            setTimeout(()=>{
-                canvas.style.transition = 'none'; 
-                
-                // حساب القطاع الفائز (المنطق المصحح)
-                const radPerSector = 2 * Math.PI / sectors.length;
-                let normalizedAngle = currentAngle % (2 * Math.PI);
-                let angleFromArrow = normalizedAngle + (Math.PI / 2); 
-                let rawIndex = angleFromArrow / radPerSector;
-                
-                let idx = sectors.length - 1 - Math.floor(rawIndex % sectors.length);
-                if (idx < 0) idx += sectors.length;
+            // **[تعديل]: استدعاء GigaPub قبل بدء الدوران**
+            window.showGiga()
+                .then(() => {
+                    // **يتم تشغيل الدوران فقط عند نجاح عرض الإعلان**
+                    
+                    // زيادة عدد الدورات وتحديث واجهة المستخدم قبل بدء الدوران
+                    spinsToday += 1;
+                    updateUI(); 
+                    
+                    spinning = true;
+                    spinBtn.disabled = true;
+                    spinResult.textContent = '';
+                    
+                    // منطق الدوران
+                    const spins = 5 + Math.random()*5; 
+                    const finalAngle = Math.random()*2*Math.PI;
+                    const totalAngle = spins*2*Math.PI + finalAngle;
+                    currentAngle += totalAngle;
+                    
+                    canvas.style.transition = 'transform 4s cubic-bezier(0.22,0,0.2,1)';
+                    canvas.style.transform = `rotate(${currentAngle}rad)`;
+                    
+                    setTimeout(()=>{
+                        canvas.style.transition = 'none'; 
+                        
+                        // حساب القطاع الفائز (المنطق المصحح)
+                        const radPerSector = 2 * Math.PI / sectors.length;
+                        let normalizedAngle = currentAngle % (2 * Math.PI);
+                        let angleFromArrow = normalizedAngle + (Math.PI / 2); 
+                        let rawIndex = angleFromArrow / radPerSector;
+                        
+                        let idx = sectors.length - 1 - Math.floor(rawIndex % sectors.length);
+                        if (idx < 0) idx += sectors.length;
 
-                const prize = sectors[idx];
-                shibBalance += prize;
-                spinResult.textContent = `🎉 You won ${prize} SHIB!`;
-                
-                spinning   = false;
-                updateUI(); // تحديث نهائي لحالة الزر والعدادات
-            },4000);
+                        const prize = sectors[idx];
+                        shibBalance += prize;
+                        spinResult.textContent = `🎉 You won ${prize} SHIB!`;
+                        
+                        spinning   = false;
+                        updateUI(); // تحديث نهائي لحالة الزر والعدادات
+                    },4000);
+
+                })
+                .catch(e => {
+                    // **التعامل مع الأخطاء**
+                    console.error("GigaPub Ad failed to show or was dismissed:", e);
+                    Telegram.WebApp.showAlert('❌ Failed to load ad. Spin was not counted. Please try again.');
+                    // لا نزيد العداد ولا تبدأ العجلة في حالة فشل الإعلان
+                });
         }
 
         /* ===== Navigation and Withdraw ===== */
