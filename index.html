@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SHIB Ads WebApp</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
+    <script src="https://cdn.jsdelivr.net/npm/js-sha256@0.9.0/src/sha256.min.js"></script> <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap'); 
 
@@ -505,6 +505,26 @@ You will earn 5% of the revenue from every referral you bring through ads!
         let referrerId = getRefParam();
         const API_URL = '/api'; 
 
+        // ⬅️ جديد: المفتاح السري للعميل (يجب أن يكون مخفياً في بيئة الإنتاج الحقيقية)
+        const CLIENT_SECRET_KEY = 'your-very-secret-key-replace-me'; 
+        // ------------------------------------------------------------------
+        
+        /**
+         * NEW: Generates the SHA256 signature for the request.
+         * @param {number} user_id The Telegram user ID.
+         * @param {string} type The API request type (e.g., 'watchAd').
+         * @returns {string} The SHA256 signature string.
+         */
+        function generateSignature(user_id, type) {
+            // sha256 هي الدالة التي توفرها المكتبة المستوردة
+            if (typeof sha256 !== 'function') {
+                console.error('SHA-256 library not loaded.');
+                return '';
+            }
+            const dataToSign = `${user_id}:${type}:${CLIENT_SECRET_KEY}`;
+            return sha256(dataToSign); 
+        }
+
         // ------------------------------------------------------------------
         // **دالة fetchApi** (مع التحقق الأمني من دوال Telegram)
         // ------------------------------------------------------------------
@@ -512,6 +532,12 @@ You will earn 5% of the revenue from every referral you bring through ads!
             if (!tgUser) {
                 Telegram.WebApp.showAlert('❌ User data not initialized. Cannot perform action.');
                 return { ok: false, error: 'User not initialized' };
+            }
+
+            // ⬅️ جديد: إنشاء التوقيع للطلبات الحساسة
+            const sensitiveTypes = ['watchAd', 'spin', 'spinResult', 'withdraw'];
+            if (sensitiveTypes.includes(payload.type)) {
+                payload.signature = generateSignature(tgUser.id, payload.type);
             }
 
             if (typeof Telegram.WebApp.showProgress === 'function') {
@@ -650,16 +676,17 @@ You will earn 5% of the revenue from every referral you bring through ads!
             }
             sessionStorage.setItem('lastAdClickTime', now);
             
-            if(adsWatchedToday >= DAILY_MAX){
-                Telegram.WebApp.showAlert('✅ You have reached the daily limit of 100 ads. Come back tomorrow!');
-                return;
-            }
+            // ⬅️ تم إزالة التحقق المحلي من الحد الأقصى - يعتمد على الخادم الآن
+            // if(adsWatchedToday >= DAILY_MAX){
+            //     Telegram.WebApp.showAlert('✅ You have reached the daily limit of 100 ads. Come back tomorrow!');
+            //     return;
+            // }
             
             window.showGiga()
                 .then(async () => {
-                    // 1. طلب مكافأة الإعلان من الخادم (بدون إرسال قيمة المكافأة)
+                    // 1. طلب مكافأة الإعلان من الخادم 
                     const adResult = await fetchApi({
-                        type: 'watchAd' // ⬅️ الخادم يحدد المكافأة (3 SHIB)
+                        type: 'watchAd' // ⬅️ التوقيع يُضاف في fetchApi
                     });
 
                     if (adResult.ok) {
@@ -689,6 +716,9 @@ You will earn 5% of the revenue from every referral you bring through ads!
                         if(adResult.data.new_ads_count >= DAILY_MAX){
                             Telegram.WebApp.showAlert('🎉 Great! You completed 100 ads today.');
                         }
+                    } else {
+                        // في حالة فشل الخادم بسبب التوقيع أو الحد الأقصى، يتم عرض رسالة الخطأ
+                        // ولا يلزم إعادة تحميل البيانات.
                     }
                 })
                 .catch(e => {
@@ -814,13 +844,16 @@ You will earn 5% of the revenue from every referral you bring through ads!
             }
             sessionStorage.setItem('lastSpinClickTime', now);
 
-            if (spinsToday >= DAILY_MAX_SPINS) {
-                Telegram.WebApp.showAlert('⚠️ لقد وصلت إلى الحد الأقصى للدوران اليومي (15 مرة). يرجى العودة غداً!');
-                return;
-            }
+            // ⬅️ تم إزالة التحقق المحلي من الحد الأقصى - يعتمد على الخادم الآن
+            // if (spinsToday >= DAILY_MAX_SPINS) {
+            //     Telegram.WebApp.showAlert('⚠️ لقد وصلت إلى الحد الأقصى للدوران اليومي (15 مرة). يرجى العودة غداً!');
+            //     return;
+            // }
             
             // 1. طلب تسجيل طلب الدوران أولاً
-            const spinReqResult = await fetchApi({ type: 'spin' });
+            const spinReqResult = await fetchApi({ 
+                type: 'spin' // ⬅️ التوقيع يُضاف في fetchApi
+            });
 
             if (!spinReqResult.ok) {
                 return; 
@@ -849,7 +882,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
                         
                         // 3. طلب تسجيل نتيجة الدوران وإضافة الجائزة للرصيد (بدون إرسال قيمة الجائزة!)
                         const spinResultPayload = {
-                            type: 'spinResult' // ⬅️ إرسال نوع الطلب فقط، الخادم يحسب الجائزة
+                            type: 'spinResult' // ⬅️ التوقيع يُضاف في fetchApi، والخادم يحسب الجائزة
                         };
                         const spinResultRes = await fetchApi(spinResultPayload);
                         
@@ -940,9 +973,9 @@ You will earn 5% of the revenue from every referral you bring through ads!
             
             // 1. إرسال طلب السحب عبر API
             const result = await fetchApi({
-                type: 'withdraw',
+                type: 'withdraw', // ⬅️ التوقيع يُضاف في fetchApi
                 binanceId: binanceId,
-                amount: amount // ⬅️ يتم التحقق من صحة المبلغ والرصيد على الخادم
+                amount: amount 
             });
 
             if (result.ok) {
