@@ -1,8 +1,6 @@
-// استخدام fetch المتاح في بيئة Vercel
-// لا نحتاج لاستيراد مكتبة Supabase JS
-// import { createClient } from '@supabase/supabase-js'; 
+// لا توجد استيرادات لمكتبات خارجية - نعتمد فقط على fetch وبيئة Vercel
 
-// **ملاحظة: تأكد من تعيين هذه المتغيرات في إعدادات Vercel**
+// **تأكد من تعيين هذه المتغيرات في إعدادات Vercel**
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -11,7 +9,7 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
  * دالة مساعدة عامة للاتصال بـ Supabase REST API مباشرة.
  * @param {string} method - طريقة HTTP (GET, POST, PATCH).
  * @param {string} table - اسم الجدول.
- * @param {object} queryParams - معاملات الاستعلام (Filters, Selects, Count).
+ * @param {object} queryParams - معاملات الاستعلام (Filters, Selects, onConflict, Count).
  * @param {object | null} body - جسم الطلب لـ POST/PATCH.
  * @returns {Promise<any>} البيانات المسترجعة أو رسالة نجاح.
  */
@@ -20,7 +18,7 @@ async function restCall(method, table, queryParams = {}, body = null) {
         throw new Error("Supabase environment variables not set.");
     }
 
-    // بناء URL: https://[URL]/rest/v1/[table]?select=*&user_id=eq.[id]
+    // بناء URL: https://[URL]/rest/v1/[table]
     const url = new URL(`${SUPABASE_URL}/rest/v1/${table}`);
     
     const headers = {
@@ -30,12 +28,13 @@ async function restCall(method, table, queryParams = {}, body = null) {
 
     let preferHeader = 'return=representation';
 
-    // إضافة مرشحات الاستعلام (مثل eq, select, order) إلى URL
+    // إضافة مرشحات الاستعلام (eq, select, on_conflict) إلى URL
     Object.keys(queryParams).forEach(key => {
-        // نستخدم Prefer: count=exact لجلب العدد
         if (key === 'count' && queryParams[key] === 'exact') {
+            // نستخدم Prefer: count=exact لجلب العدد
             preferHeader = 'count=exact';
-        } else if (key === 'onConflict') {
+        } else if (key === 'onConflict' && (method === 'POST' || method === 'PATCH')) {
+            // معالجة UPSERT/Update Conflict. يتم تمريره كـ Query Param
             url.searchParams.append('on_conflict', queryParams[key]);
         } else {
             url.searchParams.append(key, queryParams[key]);
@@ -47,7 +46,6 @@ async function restCall(method, table, queryParams = {}, body = null) {
         headers['Content-Type'] = 'application/json';
         headers['Prefer'] = preferHeader;
     } else {
-        // عند الجلب، نحتاج فقط لرأس الـ Accept والـ Authorization
         headers['Accept'] = 'application/json';
         if (queryParams.count === 'exact') {
             headers['Prefer'] = preferHeader;
@@ -63,13 +61,13 @@ async function restCall(method, table, queryParams = {}, body = null) {
 
     const response = await fetch(url.toString(), options);
     
+    // في حالة خطأ Supabase
     if (!response.ok) {
         const errorText = await response.text();
-        // إرجاع خطأ يحتوي على تفاصيل Supabase
-        throw new Error(`Supabase REST Error (${response.status} ${response.statusText}): ${errorText}`);
+        throw new Error(`Supabase API Error (${response.status}): ${errorText}`);
     }
 
-    // إذا كان طلب جلب عدد، فإن العدد يكون في رأس Content-Range
+    // لطلبات جلب العدد (COUNT)
     if (queryParams.count === 'exact') {
         const contentRange = response.headers.get('content-range');
         const count = contentRange ? parseInt(contentRange.split('/')[1]) : 0;
@@ -77,6 +75,8 @@ async function restCall(method, table, queryParams = {}, body = null) {
     }
 
     // لطلبات الجلب العادية
+    if (response.status === 204) return []; // No Content
+    
     const json = await response.json();
     return json;
 }
@@ -97,11 +97,13 @@ function isNewDay(lastUpdated) {
 
 
 export default async (req, res) => {
+    // التأكد من أن نوع الطلب هو POST
     if (req.method !== 'POST') {
         return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
     }
 
     try {
+        // استخراج البيانات من جسم الطلب
         const { type, user_id, ...data } = req.body;
 
         if (!user_id || !type) {
@@ -117,7 +119,7 @@ export default async (req, res) => {
                         user_id,
                         type: 'referral_received',
                         amount: 0, 
-                        data: { ref_by: data.ref_by }
+                        data: { ref_by: data.ref_by } // **نستخدم 'data'**
                     });
                 }
                 // 2. تسجيل عمل التسجيل
@@ -131,12 +133,10 @@ export default async (req, res) => {
                 let statsData = null;
                 try {
                     const result = await restCall('GET', 'user_stats', { select: '*', user_id: `eq.${user_id}` });
-                    // Supabase REST تُرجع مصفوفة، نأخذ أول عنصر
                     if (result && result.length > 0) {
                         statsData = result[0]; 
                     }
                 } catch (e) {
-                    // نتجاهل الأخطاء إذا كانت تدل على عدم وجود سجل (PGRST116)
                     console.warn('Stats not found or REST error on select, treating as new user:', e.message);
                 }
 
@@ -151,8 +151,8 @@ export default async (req, res) => {
                 
                 // 3. جلب عدد الإحالات
                 const { count: refCount } = await restCall('GET', 'shib_actions', { 
-                    select: 'id', // نطلب فقط معرف الـ id لتقليل حجم الاستجابة
-                    'data->>ref_by': `eq.${String(user_id)}`, 
+                    select: 'id', 
+                    'data->>ref_by': `eq.${String(user_id)}`, // البحث داخل حقل 'data'
                     type: 'eq.referral_received', 
                     count: 'exact'
                 });
@@ -201,10 +201,10 @@ export default async (req, res) => {
                      user_id: referrer_id,
                      type: 'commission_earned',
                      amount: commissionAmount,
-                     data: { referee_id, source_reward }
+                     data: { referee_id, source_reward } // **نستخدم 'data'**
                  });
 
-                 // 2. تحديث رصيد المُحيل
+                 // 2. تحديث رصيد المُحيل (يجب جلب الرصيد القديم أولاً)
                  const refStatsResult = await restCall('GET', 'user_stats', { 
                     select: 'balance', 
                     user_id: `eq.${referrer_id}` 
@@ -230,7 +230,7 @@ export default async (req, res) => {
                     user_id,
                     type: 'withdrawal_request',
                     amount: parseFloat(amount),
-                    data: { binance_id: binanceId }
+                    data: { binance_id: binanceId } // **نستخدم 'data'**
                 });
 
                 return res.status(200).json({ ok: true, message: 'Withdrawal request logged.' });
@@ -240,6 +240,7 @@ export default async (req, res) => {
         }
     } catch (error) {
         console.error('API Handler Error:', error.message);
+        // عند حدوث خطأ، نرسل تفاصيل الخطأ لتسهيل تتبعه
         return res.status(500).json({ ok: false, error: 'Internal Server Error', details: error.message });
     }
 };
