@@ -38,7 +38,7 @@ function sendSuccess(res, data = {}) {
 }
 
 /**
- * Sends a JSON error response with status 400, 403 or 500.
+ * Sends a JSON error response with status 400 or 500.
  * @param {Response} res The response object.
  * @param {string} message The error message.
  * @param {number} statusCode The HTTP status code (default 400).
@@ -447,17 +447,16 @@ module.exports = async (req, res) => {
       return sendError(res, 'Missing user_id in the request body.', 400);
   }
 
-  // >>>>>>>>> التعديل الجديد: التحقق من وجود init_data <<<<<<<<<
+  // >>>>>>>>> التعديل الضروري: التحقق من وجود init_data <<<<<<<<<
   // يتم فرض وجود init_data لجميع العمليات الحساسة التي تتطلب أمانًا
   const { init_data } = body;
   const SECURE_TYPES = ['watchAd', 'spin', 'spinResult', 'withdraw']; 
 
-  if (SECURE_TYPES.includes(body.type) && !init_data) {
-      // رسالة الخطأ التي تظهر للعميل
+  if (SECURE_TYPES.includes(body.type) && (!init_data || init_data.length < 10)) {
+      // هذه الرسالة هي التي تظهر لك:
       return sendError(res, 'Missing Telegram WebApp initialization data for security check.', 403);
   }
-  // >>>>>>>>> نهاية التعديل الجديد <<<<<<<<<
-
+  // >>>>>>>>> نهاية التعديل <<<<<<<<<
 
   // Route the request based on the 'type' field
   switch (body.type) {
