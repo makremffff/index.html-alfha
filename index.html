@@ -507,6 +507,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
 
         // ------------------------------------------------------------------
         // **دالة مساعدة جديدة: لإرسال طلبات POST الآمنة إلى Vercel API**
+        // **تم التعديل: إضافة تحقق قبل showProgress و hideProgress لمنع TypeError**
         // ------------------------------------------------------------------
         async function fetchApi(payload) {
             if (!tgUser) {
@@ -514,9 +515,12 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 return { ok: false, error: 'User not initialized' };
             }
 
-            try {
+            // **التعديل 1: إضافة تحقق قبل showProgress()**
+            if (typeof Telegram.WebApp.showProgress === 'function') {
                 Telegram.WebApp.showProgress();
-
+            }
+            
+            try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: {
@@ -528,7 +532,10 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     }),
                 });
 
-                Telegram.WebApp.hideProgress();
+                // **التعديل 2: إضافة تحقق قبل hideProgress()**
+                if (typeof Telegram.WebApp.hideProgress === 'function') {
+                    Telegram.WebApp.hideProgress();
+                }
 
                 const data = await response.json();
 
@@ -541,7 +548,10 @@ You will earn 5% of the revenue from every referral you bring through ads!
 
                 return data;
             } catch (error) {
-                Telegram.WebApp.hideProgress();
+                // **التعديل 3: إضافة تحقق قبل hideProgress() في حالة الخطأ**
+                if (typeof Telegram.WebApp.hideProgress === 'function') {
+                    Telegram.WebApp.hideProgress();
+                }
                 console.error(`General Fetch Error for type ${payload.type}:`, error.message);
                 Telegram.WebApp.showAlert(`❌ Network Error: ${error.message}`);
                 return { ok: false, error: error.message };
