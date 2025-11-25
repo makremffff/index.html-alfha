@@ -1,19 +1,24 @@
 // api/index.js
-const { URLSearchParams } = require('url');
+// Vercel Serverless Function - Node.js
 
 // إعدادات Supabase من متغيرات البيئة
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const TABLE_NAME = 'shib_actions';
+const SHIB_ACTIONS_TABLE = 'shib_actions'; // لـ register, commission, withdraw, update_stats LOG
+const USER_STATS_TABLE = 'user_stats';     // لـ get_stats و update_stats
+
+/**
+ * دالة مساعدة لتحديد ما إذا كان التاريخان يقعان في نفس اليوم (UTC).
+ */
+function isSameDay(date1, date2) {
+    // التحقق من السنة والشهر واليوم
+    return date1.getUTCFullYear() === date2.getUTCFullYear() &&
+           date1.getUTCMonth() === date2.getUTCMonth() &&
+           date1.getUTCDate() === date2.getUTCDate();
+}
 
 /**
  * دالة عامة لإجراء اتصال بـ Supabase REST API باستخدام fetch.
- *
- * @param {string} table - اسم الجدول المراد التعامل معه.
- * @param {string} method - نوع طلب HTTP (POST, GET, PATCH, DELETE).
- * @param {Object} body - جسم الطلب (للـ POST والـ PATCH).
- * @param {string} [filter=""] - سلسلة استعلام لتصفية البيانات (مثل `id=eq.123`).
- * @returns {Promise<Object>} بيانات الاستجابة من Supabase.
  */
 async function call(table, method, body = null, filter = "") {
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -30,8 +35,23 @@ async function call(table, method, body = null, filter = "") {
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Prefer': 'return=minimal' // لتسريع الاستجابة
     };
+    
+    // إعدادات خاصة للحصول على البيانات أو تنفيذ UPSERT
+    if (method === 'GET' || (method === 'POST' && table === USER_STATS_TABLE)) {
+        // للـ GET/SELECT نطلب تمثيل البيانات
+        headers['Prefer'] = 'return=representation'; 
+    } else {
+        // لعمليات التسجيل الأخرى نطلب الحد الأدنى من الإرجاع
+        headers['Prefer'] = 'return=minimal'; 
+    }
+    
+    // لعملية UPSERT على user_stats (تحديث إذا وُجد، وإضافة إذا لم يُوجد)
+    if (method === 'POST' && table === USER_STATS_TABLE) {
+        // نحدد أن التعارض يتم بناءً على user_id
+        headers['Prefer'] += ', on-conflict=user_id';
+    }
+
 
     const config = {
         method: method,
@@ -46,123 +66,185 @@ async function call(table, method, body = null, filter = "") {
 
     if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Supabase API Error: ${response.status} - ${errorText}`);
+        let errorMessage = errorText;
+        try {
+            const errorJson = JSON.parse(errorText);
+            if (errorJson.message) {
+                errorMessage = errorJson.message;
+            }
+        } catch (e) {} // في حالة عدم وجود JSON
+        throw new Error(`Supabase API Error (${response.status}): ${errorMessage}`);
     }
 
-    // لا تقم بإرجاع json() إذا كان return=minimal (201, 204)
-    if (response.status === 201 || response.status === 204) {
-        return { message: "Action recorded successfully." };
+    if (response.status === 204) { // No Content
+        return { message: "Action recorded successfully (No content returned)." };
     }
     
-    // للـ GET
-    return response.json();
+    // إذا كان Prefer يطلب تمثيل البيانات، نرجع الـ JSON
+    if (headers['Prefer'].includes('return=representation')) {
+         // تأكد من عدم محاولة قراءة الجسم إذا كان فارغًا
+         const contentLength = response.headers.get('content-length');
+         if (contentLength === '0' || response.status === 204) return [];
+        return response.json();
+    }
+    
+    return { message: "Action recorded successfully." };
 }
 
 /**
- * معالج طلب WebApp الرئيسي.
- * @param {Object} req - كائن الطلب (Vercel).
- * @param {Object} res - كائن الاستجابة (Vercel).
+ * المعالج الرئيسي للطلبات.
  */
 module.exports = async (req, res) => {
-    // 13. دعم CORS: السماح بالوصول من أي مصدر لطلبات WebApp (يمكن تضييقه لاحقًا)
+    // إعدادات CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    // التعامل مع طلب OPTIONS (Pre-flight request)
     if (req.method === 'OPTIONS') {
         res.writeHead(204);
         res.end();
         return;
     }
 
-    // 1. كل الطلبات تكون عبر POST فقط.
     if (req.method !== 'POST') {
-        res.status(405).json({ ok: false, error: "Method Not Allowed. Only POST is supported." });
-        return;
+        return res.status(405).json({ ok: false, error: "Method Not Allowed. Only POST is supported." });
     }
 
     let body;
     try {
-        // فك JSON من req.body (يتطلب أن يكون الخادم قادرًا على قراءة stream أو استخدام body-parser)
-        // في Vercel Serverless، يتم تحليل الجسم تلقائيًا لـ JSON إذا كان Content-Type هو application/json
         body = req.body;
     } catch (e) {
-        res.status(400).json({ ok: false, error: "Invalid JSON body." });
-        return;
+        return res.status(400).json({ ok: false, error: "Invalid JSON body received." });
     }
 
-    // 2. التحقق من وجود "type"
     if (!body || !body.type) {
-        res.status(400).json({ ok: false, error: "Missing 'type' field in the request body." });
-        return;
+        return res.status(400).json({ ok: false, error: "Missing 'type' field in the request body." });
     }
 
     const { type } = body;
-    let userId = null; // 9. user_id يبدأ بقيمة null
+    let userId = null;
 
-    // محاولة استخراج user_id من الحمولة مباشرة إذا كان موجوداً
     if (body.user_id) {
         userId = body.user_id;
     } else if (body.referee_id) { 
-        // قد يكون referee_id هو المستخدم في حالة commission
         userId = body.referee_id;
     }
 
     const logPayload = {
         type: type,
-        user_id: userId,
-        payload: body, // 9. تخزين الحمولة كاملة
+        user_id: userId, 
+        payload: body,   
     };
 
     try {
-        // 3. نستخدم Switch(type) لمعالجة كل نوع.
         switch (type) {
-            case 'register': {
-                // 8. استلام كامل المعلومات: (user_id, ref_by)
-                const { user_id, ref_by } = body;
+            
+            // =======================================================
+            // 1. أكشن جلب حالة المستخدم (get_stats) - لتنفيذ Daily Reset
+            // =======================================================
+            case 'get_stats': {
+                if (!userId) {
+                    return res.status(400).json({ ok: false, error: "user_id is required for get_stats." });
+                }
 
-                // **منطق معالجة register:**
-                // هنا يتم تسجيل المستخدم في جدول المستخدمين (خارج نطاق هذا الطلب)
-                // يتم الآن فقط تسجيل الأكشن في shib_actions
-                await call(TABLE_NAME, 'POST', logPayload);
+                // 1. جلب حالة المستخدم الحالية
+                let statsResponse = await call(USER_STATS_TABLE, 'GET', null, `user_id=eq.${userId}`);
+                let userStats = statsResponse.length > 0 ? statsResponse[0] : null;
                 
-                // 11. إرجاع رد JSON: { ok:true }
-                res.status(200).json({ ok: true, message: `Registered action recorded for user ${user_id}.` });
-                break;
-            }
-            case 'commission': {
-                // 8. استلام كامل المعلومات: (referrer_id, referee_id, amount, source_reward)
-                const { referrer_id, referee_id, amount, source_reward } = body;
-                
-                // **منطق معالجة commission:**
-                // هنا يتم إضافة الـ amount لرصيد الـ referrer_id (خارج نطاق هذا الطلب)
-                // يتم الآن فقط تسجيل الأكشن في shib_actions
-                await call(TABLE_NAME, 'POST', logPayload);
+                const now = new Date();
+                let resetNeeded = false;
 
-                res.status(200).json({ ok: true, message: `Commission action recorded for referrer ${referrer_id}.` });
-                break;
+                if (userStats) {
+                    // 2. التحقق من إعادة التعيين اليومية
+                    const lastUpdate = new Date(userStats.last_update);
+                    if (!isSameDay(now, lastUpdate)) {
+                        userStats.ads_watched_today = 0;
+                        userStats.spins_today = 0;
+                        resetNeeded = true;
+                    }
+                } else {
+                    // 3. مستخدم جديد: إنشاء سجل افتراضي
+                    userStats = {
+                        user_id: userId,
+                        balance: 0,
+                        ads_watched_today: 0,
+                        spins_today: 0,
+                        referrals_count: 0,
+                        last_update: now.toISOString()
+                    };
+                    resetNeeded = true; // لضمان إضافته لأول مرة
+                }
+                
+                // 4. حفظ الحالة الجديدة (إذا تم إعادة التعيين أو كان مستخدم جديد)
+                if (resetNeeded) {
+                     await call(USER_STATS_TABLE, 'POST', {
+                        user_id: userId,
+                        balance: parseFloat(userStats.balance),
+                        ads_watched_today: userStats.ads_watched_today,
+                        spins_today: userStats.spins_today,
+                        last_update: now.toISOString(),
+                        referrals_count: userStats.referrals_count
+                     });
+                }
+                
+                // 5. إرجاع حالة المستخدم (Stats)
+                return res.status(200).json({ ok: true, stats: userStats });
             }
+
+            // =======================================================
+            // 2. أكشن تحديث حالة المستخدم (update_stats) - لحفظ الرصيد والعدادات
+            // =======================================================
+            case 'update_stats': {
+                // الحقول المتوقعة: user_id, balance, ads_watched_today, spins_today
+                const { balance, ads_watched_today, spins_today } = body;
+
+                if (!userId || balance === undefined || ads_watched_today === undefined || spins_today === undefined) {
+                    return res.status(400).json({ ok: false, error: "Missing required fields for update_stats." });
+                }
+                
+                const now = new Date();
+                
+                // أ. تسجيل الأكشن في جدول shib_actions (للتوثيق)
+                await call(SHIB_ACTIONS_TABLE, 'POST', {
+                    type: 'update_stats',
+                    user_id: userId,
+                    payload: body
+                });
+
+                // ب. حفظ حالة المستخدم الدائمة (UPSERT)
+                await call(USER_STATS_TABLE, 'POST', {
+                    user_id: userId,
+                    balance: parseFloat(balance), 
+                    ads_watched_today: parseInt(ads_watched_today),
+                    spins_today: parseInt(spins_today),
+                    last_update: now.toISOString()
+                });
+
+                return res.status(200).json({ ok: true, message: `User stats updated successfully for user ${userId}.` });
+            }
+            
+            // =======================================================
+            // 3. الأكشنات الأصلية (Log Only)
+            // =======================================================
+            case 'register':
+            case 'commission':
             case 'withdraw': {
-                // 8. استلام كامل المعلومات: (binanceId, amount)
-                const { binanceId, amount } = body;
+                // تسجيل الأكشن في جدول shib_actions فقط
+                await call(SHIB_ACTIONS_TABLE, 'POST', logPayload);
+                
+                // يمكنك إضافة منطق تحديث الرصيد هنا في المستقبل إذا أردت جعل الـ Backend هو مصدر الحقيقة
+                // حالياً، يتم الاعتماد على Frontend لإرسال "update_stats" بشكل منفصل بعد كل عملية ربح/سحب
 
-                // **منطق معالجة withdraw:**
-                // هنا يتم التحقق من الرصيد وبدء عملية السحب اليدوية (خارج نطاق هذا الطلب)
-                // يتم الآن فقط تسجيل الأكشن في shib_actions
-                await call(TABLE_NAME, 'POST', logPayload);
-
-                res.status(200).json({ ok: true, message: `Withdrawal action recorded for Binance ID ${binanceId}.` });
-                break;
+                return res.status(200).json({ ok: true, message: `${type} action recorded.` });
             }
+            
             default:
-                // 11. تسجيل الخطأ إذا كان type غير معروف
+                // معالجة الأكشنات غير المعروفة
                 console.error(`Unknown action type: ${type}`);
-                res.status(400).json({ ok: false, error: `Unknown action type: ${type}.` });
-                break;
+                return res.status(400).json({ ok: false, error: `Unknown action type: ${type}.` });
         }
     } catch (error) {
         console.error('API Handler Error:', error.message);
-        res.status(500).json({ ok: false, error: `Internal Server Error: ${error.message}` });
+        return res.status(500).json({ ok: false, error: `Internal Server Error: ${error.message}` });
     }
 };
