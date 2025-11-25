@@ -1,8 +1,8 @@
-// /api/index.js
+د// /api/index.js
 
 /**
  * SHIB Ads WebApp Backend API
- * Handles all requests from the Telegram Mini App frontend.
+ * Handles all POST requests from the Telegram Mini App frontend.
  * Uses the Supabase REST API for persistence.
  */
 
@@ -52,6 +52,8 @@ async function supabaseFetch(tableName, method, body = null, queryParams = '?sel
     'apikey': SUPABASE_ANON_KEY,
     'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
     'Content-Type': 'application/json',
+    // Header for POST/PATCH to return the updated/inserted object, but Supabase often returns empty array on success.
+    'Prefer': 'return=representation' 
   };
 
   const options = {
@@ -62,31 +64,83 @@ async function supabaseFetch(tableName, method, body = null, queryParams = '?sel
 
   const response = await fetch(url, options);
   
-  // Supabase responses for mutation operations (POST, PATCH) might be an empty array on success
-  if (method === 'POST' || method === 'PATCH') {
+  // Handling success responses (2xx)
+  if (response.ok) {
       const responseText = await response.text();
-      // Check for success status codes (201 Created, 200 OK)
-      if (response.ok) {
-          try {
-              return JSON.parse(responseText);
-          } catch (e) {
-              // Return a generic success object if response is empty (e.g., 204 or empty body)
-              return { success: true }; 
-          }
+      try {
+          // Attempt to parse JSON. Returns the data or an empty array/object
+          const jsonResponse = JSON.parse(responseText);
+          return jsonResponse.length > 0 ? jsonResponse : { success: true };
+      } catch (e) {
+          // Handle empty response body (e.g., 204 No Content or empty 201)
+          return { success: true }; 
       }
   }
 
-  const data = await response.json();
-
-  if (!response.ok) {
-    const errorMsg = data.message || `Supabase error: ${response.status} ${response.statusText}`;
-    throw new Error(errorMsg);
+  // Handling error responses (4xx, 5xx)
+  let data;
+  try {
+      data = await response.json();
+  } catch (e) {
+      // If response is not JSON
+      const errorMsg = `Supabase error: ${response.status} ${response.statusText}`;
+      throw new Error(errorMsg);
   }
 
-  return data;
+  const errorMsg = data.message || `Supabase error: ${response.status} ${response.statusText}`;
+  throw new Error(errorMsg);
 }
 
 // --- API Handlers ---
+
+/**
+ * NEW HANDLER: type: "getUserData"
+ * Fetches the current user data (balance, counts, and history) for UI initialization.
+ */
+async function handleGetUserData(req, res, body) {
+    const { user_id } = body;
+
+    if (!user_id) {
+        return sendError(res, 'Missing user_id for data fetch.');
+    }
+    const id = parseInt(user_id);
+
+    try {
+        // 1. Fetch user data (balance, ads_watched_today, spins_today)
+        const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance,ads_watched_today,spins_today`);
+        if (!users || users.length === 0) {
+            // Return default state if user hasn't registered yet (though register should handle this first)
+            return sendSuccess(res, { 
+                balance: 0, 
+                ads_watched_today: 0, 
+                spins_today: 0,
+                referrals_count: 0,
+                withdrawal_history: []
+            });
+        }
+        
+        const userData = users[0];
+
+        // 2. Fetch referrals count
+        const referrals = await supabaseFetch('users', 'GET', null, `?ref_by=eq.${id}&select=id`);
+        const referralsCount = referrals.length;
+
+        // 3. Fetch withdrawal history
+        // Ordering by creation date descending
+        const history = await supabaseFetch('withdrawals', 'GET', null, `?user_id=eq.${id}&select=amount,status,created_at&order=created_at.desc`);
+
+        sendSuccess(res, {
+            ...userData,
+            referrals_count: referralsCount,
+            withdrawal_history: history || []
+        });
+
+    } catch (error) {
+        console.error('GetUserData failed:', error.message);
+        sendError(res, `Failed to retrieve user data: ${error.message}`, 500);
+    }
+}
+
 
 /**
  * 1) type: "register"
@@ -157,7 +211,8 @@ async function handleWatchAd(req, res, body) {
     const newAdsCount = user.ads_watched_today + 1;
 
     // 2. Update user record: balance and ads_watched_today
-    await supabaseFetch('users', 'PATCH', 
+    // Supabase PATCH returns the updated record if 'Prefer: return=representation' is set (added in helper)
+    const [updatedUser] = await supabaseFetch('users', 'PATCH', 
       { balance: newBalance, ads_watched_today: newAdsCount }, 
       `?id=eq.${id}`);
 
@@ -166,8 +221,8 @@ async function handleWatchAd(req, res, body) {
       { user_id: id, reward }, 
       '?select=user_id');
 
-    // 4. Return new balance
-    sendSuccess(res, { new_balance: newBalance });
+    // 4. Return new balance and count
+    sendSuccess(res, { new_balance: newBalance, new_ads_count: newAdsCount });
   } catch (error) {
     console.error('WatchAd failed:', error.message);
     sendError(res, `WatchAd failed: ${error.message}`, 500);
@@ -196,7 +251,7 @@ async function handleCommission(req, res, body) {
     // 1. Fetch current referrer balance
     const users = await supabaseFetch('users', 'GET', null, `?id=eq.${referrerId}&select=balance`);
     if (!users || users.length === 0) {
-        // Log, but still record history, or just abort. Aborting is safer.
+        // Commission aborts if referrer not found, but returns success to the caller (frontend)
         console.warn(`Referrer ID ${referrerId} not found for commission.`);
         return sendSuccess(res, { message: 'Referrer not found, commission aborted.' });
     }
@@ -362,7 +417,7 @@ async function handleWithdraw(req, res, body) {
  * @param {Response} res The outgoing response object.
  */
 module.exports = async (req, res) => {
-  // CORS configuration (optional, but good practice)
+  // CORS configuration
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -379,7 +434,7 @@ module.exports = async (req, res) => {
 
   let body;
   try {
-    // Use native request.json() to parse the body
+    // Use native request.json() to parse the body (for Node.js/Vercel)
     body = await new Promise((resolve, reject) => {
       let data = '';
       req.on('data', chunk => {
@@ -387,6 +442,7 @@ module.exports = async (req, res) => {
       });
       req.on('end', () => {
         try {
+          // Attempt to parse JSON
           resolve(JSON.parse(data));
         } catch (e) {
           reject(new Error('Invalid JSON payload.'));
@@ -402,9 +458,20 @@ module.exports = async (req, res) => {
   if (!body || !body.type) {
     return sendError(res, 'Missing "type" field in the request body.', 400);
   }
+  
+  // Basic validation for user_id presence in most calls
+  if (!body.user_id && body.type !== 'commission') {
+      return sendError(res, 'Missing user_id in the request body.', 400);
+  }
 
   // Route the request based on the 'type' field
   switch (body.type) {
+    // NEW HANDLER for UI initialization
+    case 'getUserData':
+      await handleGetUserData(req, res, body);
+      break;
+    
+    // Existing Handlers
     case 'register':
       await handleRegister(req, res, body);
       break;
