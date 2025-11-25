@@ -10,6 +10,21 @@
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+// ------------------------------------------------------------------
+// ثوابت المكافآت المحددة والمؤمنة بالكامل على الخادم (لضمان عدم التلاعب)
+// ------------------------------------------------------------------
+const REWARD_PER_AD = 3; 
+const REFERRAL_COMMISSION_RATE = 0.05;
+const SPIN_SECTORS = [5, 10, 15, 20, 5]; 
+
+/**
+ * Helper function to randomly select a prize from the defined sectors.
+ */
+function calculateRandomSpinPrize() {
+    const randomIndex = Math.floor(Math.random() * SPIN_SECTORS.length);
+    return SPIN_SECTORS[randomIndex];
+}
+
 // --- Helper Functions ---
 
 /**
@@ -175,10 +190,12 @@ async function handleRegister(req, res, body) {
 /**
  * 2) type: "watchAd"
  * Adds reward to user balance and increments ads_watched_today.
+ * الحماية: تستخدم REWARD_PER_AD من الخادم فقط.
  */
 async function handleWatchAd(req, res, body) {
-  const { user_id, reward } = body;
+  const { user_id } = body;
   const id = parseInt(user_id);
+  const reward = REWARD_PER_AD; // ⬅️ قيمة المكافأة مأخوذة من الخادم (آمنة)
 
   try {
     // 1. Fetch current user data
@@ -202,7 +219,7 @@ async function handleWatchAd(req, res, body) {
       '?select=user_id');
 
     // 4. Return new state
-    sendSuccess(res, { new_balance: newBalance, new_ads_count: newAdsCount });
+    sendSuccess(res, { new_balance: newBalance, new_ads_count: newAdsCount, actual_reward: reward }); // ⬅️ إرجاع المكافأة الحقيقية
   } catch (error) {
     console.error('WatchAd failed:', error.message);
     sendError(res, `WatchAd failed: ${error.message}`, 500);
@@ -212,17 +229,21 @@ async function handleWatchAd(req, res, body) {
 /**
  * 3) type: "commission"
  * Adds commission to referrer balance and logs the event.
+ * الحماية: تحسب قيمة العمولة على الخادم.
  */
 async function handleCommission(req, res, body) {
-  const { referrer_id, referee_id, amount, source_reward } = body;
+  const { referrer_id, referee_id } = body; // ⬅️ تم إزالة 'amount' و 'source_reward' من مدخلات العميل
 
-  if (!referrer_id || !referee_id || typeof amount !== 'number') {
-    // Commission is a background task; return success even if data is invalid to avoid frontend errors.
+  if (!referrer_id || !referee_id) {
     return sendSuccess(res, { message: 'Invalid commission data received but acknowledged.' });
   }
 
   const referrerId = parseInt(referrer_id);
   const refereeId = parseInt(referee_id);
+  
+  // ⬅️ حساب العمولة بشكل آمن على الخادم
+  const sourceReward = REWARD_PER_AD;
+  const commissionAmount = sourceReward * REFERRAL_COMMISSION_RATE; 
 
   try {
     // 1. Fetch current referrer balance
@@ -232,7 +253,7 @@ async function handleCommission(req, res, body) {
         return sendSuccess(res, { message: 'Referrer not found, commission aborted.' });
     }
     
-    const newBalance = users[0].balance + amount;
+    const newBalance = users[0].balance + commissionAmount;
 
     // 2. Update referrer balance
     await supabaseFetch('users', 'PATCH', 
@@ -241,7 +262,7 @@ async function handleCommission(req, res, body) {
 
     // 3. Add record to commission_history
     await supabaseFetch('commission_history', 'POST', 
-      { referrer_id: referrerId, referee_id: refereeId, amount, source_reward }, 
+      { referrer_id: referrerId, referee_id: refereeId, amount: commissionAmount, source_reward: sourceReward }, 
       '?select=referrer_id');
 
     sendSuccess(res, { new_referrer_balance: newBalance });
@@ -287,11 +308,15 @@ async function handleSpin(req, res, body) {
 
 /**
  * 5) type: "spinResult"
- * Adds the prize to user balance and logs the result.
+ * يحسب الجائزة على الخادم، يضيفها إلى رصيد المستخدم، ويسجل النتيجة.
+ * الحماية: تتجاهل أي قيمة 'prize' من العميل.
  */
 async function handleSpinResult(req, res, body) {
-  const { user_id, prize } = body;
+  const { user_id } = body; 
   const id = parseInt(user_id);
+  
+  // ⬅️ حساب الجائزة بشكل آمن على الخادم
+  const prize = calculateRandomSpinPrize(); 
 
   try {
     // 1. Fetch current user balance
@@ -312,7 +337,8 @@ async function handleSpinResult(req, res, body) {
       { user_id: id, prize }, 
       '?select=user_id');
 
-    sendSuccess(res, { new_balance: newBalance });
+    // 4. إرجاع الجائزة الحقيقية المحسوبة في الخادم
+    sendSuccess(res, { new_balance: newBalance, actual_prize: prize }); 
   } catch (error) {
     console.error('Spin result failed:', error.message);
     sendError(res, `Spin result failed: ${error.message}`, 500);
@@ -326,6 +352,12 @@ async function handleSpinResult(req, res, body) {
 async function handleWithdraw(req, res, body) {
   const { user_id, binanceId, amount } = body;
   const id = parseInt(user_id);
+  
+  if (typeof amount !== 'number' || amount <= 0) {
+        return sendError(res, 'Invalid withdrawal amount.', 400);
+  }
+  
+  // ⬅️ المنطق الأمني: التحقق من الرصيد والحد الأدنى على الخادم
 
   try {
     // 1. Fetch current user balance to ensure sufficient funds
@@ -335,6 +367,9 @@ async function handleWithdraw(req, res, body) {
     }
 
     const currentBalance = users[0].balance;
+    if (amount < 400) { // الحد الأدنى المكرر هنا للتأكيد
+        return sendError(res, 'Minimum withdrawal is 400 SHIB.', 403);
+    }
     if (amount > currentBalance) {
         return sendError(res, 'Insufficient balance.', 403);
     }
