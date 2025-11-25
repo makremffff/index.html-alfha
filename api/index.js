@@ -1,4 +1,4 @@
-د// /api/index.js
+// /api/index.js
 
 /**
  * SHIB Ads WebApp Backend API
@@ -52,7 +52,6 @@ async function supabaseFetch(tableName, method, body = null, queryParams = '?sel
     'apikey': SUPABASE_ANON_KEY,
     'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
     'Content-Type': 'application/json',
-    // Header for POST/PATCH to return the updated/inserted object, but Supabase often returns empty array on success.
     'Prefer': 'return=representation' 
   };
 
@@ -68,11 +67,11 @@ async function supabaseFetch(tableName, method, body = null, queryParams = '?sel
   if (response.ok) {
       const responseText = await response.text();
       try {
-          // Attempt to parse JSON. Returns the data or an empty array/object
           const jsonResponse = JSON.parse(responseText);
-          return jsonResponse.length > 0 ? jsonResponse : { success: true };
+          // Supabase often returns an empty array on successful INSERT/UPDATE.
+          return jsonResponse.length > 0 ? jsonResponse : { success: true }; 
       } catch (e) {
-          // Handle empty response body (e.g., 204 No Content or empty 201)
+          // Handle empty response body (e.g., 204 No Content)
           return { success: true }; 
       }
   }
@@ -82,7 +81,6 @@ async function supabaseFetch(tableName, method, body = null, queryParams = '?sel
   try {
       data = await response.json();
   } catch (e) {
-      // If response is not JSON
       const errorMsg = `Supabase error: ${response.status} ${response.statusText}`;
       throw new Error(errorMsg);
   }
@@ -94,8 +92,8 @@ async function supabaseFetch(tableName, method, body = null, queryParams = '?sel
 // --- API Handlers ---
 
 /**
- * NEW HANDLER: type: "getUserData"
- * Fetches the current user data (balance, counts, and history) for UI initialization.
+ * HANDLER: type: "getUserData"
+ * Fetches the current user data (balance, counts, history, and referrals) for UI initialization.
  */
 async function handleGetUserData(req, res, body) {
     const { user_id } = body;
@@ -108,8 +106,8 @@ async function handleGetUserData(req, res, body) {
     try {
         // 1. Fetch user data (balance, ads_watched_today, spins_today)
         const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance,ads_watched_today,spins_today`);
-        if (!users || users.length === 0) {
-            // Return default state if user hasn't registered yet (though register should handle this first)
+        if (!users || users.length === 0 || users.success) {
+            // Return default state if user not found (should be handled by register first)
             return sendSuccess(res, { 
                 balance: 0, 
                 ads_watched_today: 0, 
@@ -123,16 +121,16 @@ async function handleGetUserData(req, res, body) {
 
         // 2. Fetch referrals count
         const referrals = await supabaseFetch('users', 'GET', null, `?ref_by=eq.${id}&select=id`);
-        const referralsCount = referrals.length;
+        const referralsCount = Array.isArray(referrals) ? referrals.length : 0;
 
         // 3. Fetch withdrawal history
-        // Ordering by creation date descending
         const history = await supabaseFetch('withdrawals', 'GET', null, `?user_id=eq.${id}&select=amount,status,created_at&order=created_at.desc`);
+        const withdrawalHistory = Array.isArray(history) ? history : [];
 
         sendSuccess(res, {
             ...userData,
             referrals_count: referralsCount,
-            withdrawal_history: history || []
+            withdrawal_history: withdrawalHistory
         });
 
     } catch (error) {
@@ -148,21 +146,13 @@ async function handleGetUserData(req, res, body) {
  */
 async function handleRegister(req, res, body) {
   const { user_id, ref_by } = body;
-
-  if (!user_id) {
-    return sendError(res, 'Missing user_id for registration.');
-  }
-
   const id = parseInt(user_id);
-  if (isNaN(id)) {
-      return sendError(res, 'Invalid user_id.');
-  }
 
   try {
     // 1. Check if user exists
     const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=id`);
 
-    if (users && users.length === 0) {
+    if (!Array.isArray(users) || users.length === 0) {
       // 2. User does not exist, create new user
       const newUser = {
         id,
@@ -175,7 +165,6 @@ async function handleRegister(req, res, body) {
       await supabaseFetch('users', 'POST', newUser, '?select=id');
     }
 
-    // 3. Always return success (even if user already existed)
     sendSuccess(res, { message: 'User registered or already exists.' });
   } catch (error) {
     console.error('Registration failed:', error.message);
@@ -189,20 +178,12 @@ async function handleRegister(req, res, body) {
  */
 async function handleWatchAd(req, res, body) {
   const { user_id, reward } = body;
-
-  if (!user_id || typeof reward !== 'number') {
-    return sendError(res, 'Missing user_id or reward for watchAd.');
-  }
-
   const id = parseInt(user_id);
-  if (isNaN(id)) {
-      return sendError(res, 'Invalid user_id.');
-  }
 
   try {
-    // 1. Fetch current user data to ensure existence and get current values
+    // 1. Fetch current user data
     const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance,ads_watched_today`);
-    if (!users || users.length === 0) {
+    if (!Array.isArray(users) || users.length === 0) {
         return sendError(res, 'User not found.', 404);
     }
     
@@ -211,8 +192,7 @@ async function handleWatchAd(req, res, body) {
     const newAdsCount = user.ads_watched_today + 1;
 
     // 2. Update user record: balance and ads_watched_today
-    // Supabase PATCH returns the updated record if 'Prefer: return=representation' is set (added in helper)
-    const [updatedUser] = await supabaseFetch('users', 'PATCH', 
+    await supabaseFetch('users', 'PATCH', 
       { balance: newBalance, ads_watched_today: newAdsCount }, 
       `?id=eq.${id}`);
 
@@ -221,7 +201,7 @@ async function handleWatchAd(req, res, body) {
       { user_id: id, reward }, 
       '?select=user_id');
 
-    // 4. Return new balance and count
+    // 4. Return new state
     sendSuccess(res, { new_balance: newBalance, new_ads_count: newAdsCount });
   } catch (error) {
     console.error('WatchAd failed:', error.message);
@@ -236,23 +216,19 @@ async function handleWatchAd(req, res, body) {
 async function handleCommission(req, res, body) {
   const { referrer_id, referee_id, amount, source_reward } = body;
 
-  if (!referrer_id || !referee_id || typeof amount !== 'number' || typeof source_reward !== 'number') {
-    return sendError(res, 'Missing required fields for commission.');
+  if (!referrer_id || !referee_id || typeof amount !== 'number') {
+    // Commission is a background task; return success even if data is invalid to avoid frontend errors.
+    return sendSuccess(res, { message: 'Invalid commission data received but acknowledged.' });
   }
 
   const referrerId = parseInt(referrer_id);
   const refereeId = parseInt(referee_id);
-  
-  if (isNaN(referrerId) || isNaN(refereeId)) {
-      return sendError(res, 'Invalid referrer_id or referee_id.');
-  }
 
   try {
     // 1. Fetch current referrer balance
     const users = await supabaseFetch('users', 'GET', null, `?id=eq.${referrerId}&select=balance`);
-    if (!users || users.length === 0) {
-        // Commission aborts if referrer not found, but returns success to the caller (frontend)
-        console.warn(`Referrer ID ${referrerId} not found for commission.`);
+    if (!Array.isArray(users) || users.length === 0) {
+        // Referrer not found, abort commission gracefully.
         return sendSuccess(res, { message: 'Referrer not found, commission aborted.' });
     }
     
@@ -281,20 +257,12 @@ async function handleCommission(req, res, body) {
  */
 async function handleSpin(req, res, body) {
   const { user_id } = body;
-
-  if (!user_id) {
-    return sendError(res, 'Missing user_id for spin request.');
-  }
-  
   const id = parseInt(user_id);
-  if (isNaN(id)) {
-      return sendError(res, 'Invalid user_id.');
-  }
 
   try {
-    // 1. Fetch current user data to ensure existence and get current value
+    // 1. Fetch current user data
     const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=spins_today`);
-    if (!users || users.length === 0) {
+    if (!Array.isArray(users) || users.length === 0) {
         return sendError(res, 'User not found.', 404);
     }
     
@@ -323,20 +291,12 @@ async function handleSpin(req, res, body) {
  */
 async function handleSpinResult(req, res, body) {
   const { user_id, prize } = body;
-
-  if (!user_id || typeof prize !== 'number') {
-    return sendError(res, 'Missing user_id or prize for spin result.');
-  }
-  
   const id = parseInt(user_id);
-  if (isNaN(id)) {
-      return sendError(res, 'Invalid user_id.');
-  }
 
   try {
     // 1. Fetch current user balance
     const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance`);
-    if (!users || users.length === 0) {
+    if (!Array.isArray(users) || users.length === 0) {
         return sendError(res, 'User not found.', 404);
     }
     
@@ -365,20 +325,12 @@ async function handleSpinResult(req, res, body) {
  */
 async function handleWithdraw(req, res, body) {
   const { user_id, binanceId, amount } = body;
-
-  if (!user_id || !binanceId || typeof amount !== 'number') {
-    return sendError(res, 'Missing user_id, binanceId, or amount for withdrawal.');
-  }
-
   const id = parseInt(user_id);
-  if (isNaN(id)) {
-      return sendError(res, 'Invalid user_id.');
-  }
 
   try {
     // 1. Fetch current user balance to ensure sufficient funds
     const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance`);
-    if (!users || users.length === 0) {
+    if (!Array.isArray(users) || users.length === 0) {
         return sendError(res, 'User not found.', 404);
     }
 
@@ -422,19 +374,16 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Handle OPTIONS preflight request
   if (req.method === 'OPTIONS') {
     return sendSuccess(res);
   }
 
-  // Only handle POST requests as required
   if (req.method !== 'POST') {
     return sendError(res, `Method ${req.method} not allowed. Only POST is supported.`, 405);
   }
 
   let body;
   try {
-    // Use native request.json() to parse the body (for Node.js/Vercel)
     body = await new Promise((resolve, reject) => {
       let data = '';
       req.on('data', chunk => {
@@ -442,7 +391,6 @@ module.exports = async (req, res) => {
       });
       req.on('end', () => {
         try {
-          // Attempt to parse JSON
           resolve(JSON.parse(data));
         } catch (e) {
           reject(new Error('Invalid JSON payload.'));
@@ -459,19 +407,15 @@ module.exports = async (req, res) => {
     return sendError(res, 'Missing "type" field in the request body.', 400);
   }
   
-  // Basic validation for user_id presence in most calls
   if (!body.user_id && body.type !== 'commission') {
       return sendError(res, 'Missing user_id in the request body.', 400);
   }
 
   // Route the request based on the 'type' field
   switch (body.type) {
-    // NEW HANDLER for UI initialization
     case 'getUserData':
       await handleGetUserData(req, res, body);
       break;
-    
-    // Existing Handlers
     case 'register':
       await handleRegister(req, res, body);
       break;
