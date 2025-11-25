@@ -506,8 +506,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
         const API_URL = '/api'; 
 
         // ------------------------------------------------------------------
-        // **دالة مساعدة جديدة: لإرسال طلبات POST الآمنة إلى Vercel API**
-        // **تم التعديل: إضافة تحقق قبل showProgress و hideProgress لمنع TypeError**
+        // **دالة fetchApi** (مع التحقق الأمني من دوال Telegram)
         // ------------------------------------------------------------------
         async function fetchApi(payload) {
             if (!tgUser) {
@@ -515,7 +514,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
                 return { ok: false, error: 'User not initialized' };
             }
 
-            // **التعديل 1: إضافة تحقق قبل showProgress()**
             if (typeof Telegram.WebApp.showProgress === 'function') {
                 Telegram.WebApp.showProgress();
             }
@@ -532,7 +530,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     }),
                 });
 
-                // **التعديل 2: إضافة تحقق قبل hideProgress()**
                 if (typeof Telegram.WebApp.hideProgress === 'function') {
                     Telegram.WebApp.hideProgress();
                 }
@@ -548,7 +545,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
 
                 return data;
             } catch (error) {
-                // **التعديل 3: إضافة تحقق قبل hideProgress() في حالة الخطأ**
                 if (typeof Telegram.WebApp.hideProgress === 'function') {
                     Telegram.WebApp.hideProgress();
                 }
@@ -558,11 +554,10 @@ You will earn 5% of the revenue from every referral you bring through ads!
             }
         }
 
-        /* ===== أنظمة المكافآت والحدود وحماية النقرات السريعة ===== */
+        /* ===== أنظمة المكافآت والحدود وحماية النقرات السريعة (الحدود لا تزال هنا للعرض فقط) ===== */
         const DAILY_MAX = 100;
-        const REWARD_PER_AD = 3;
         const DAILY_MAX_SPINS = 15;
-        const REFERRAL_COMMISSION_RATE = 0.05; 
+        // ملاحظة: قيم المكافأة (3 SHIB والعمولة 5%) تمت إزالتها واعتمادها بالكامل على الخادم.
 
         const ADS_CLICK_COOLDOWN  = 1000;
         const SPIN_CLICK_COOLDOWN = 1000; 
@@ -572,6 +567,9 @@ You will earn 5% of the revenue from every referral you bring through ads!
         let spinsToday = 0; 
         let withdrawalHistory = [];
         let referralsCount = 0; 
+        
+        // قائمة القطاعات تبقى هنا لأجل الأنميشن فقط، والقيمة الفائزة تُحدد على الخادم.
+        const sectors = [5, 10, 15, 20, 5]; 
 
         function updateState(data) {
             shibBalance = data.balance !== undefined ? data.balance : shibBalance;
@@ -658,13 +656,14 @@ You will earn 5% of the revenue from every referral you bring through ads!
             
             window.showGiga()
                 .then(async () => {
-                    // 1. طلب مكافأة الإعلان من الخادم
+                    // 1. طلب مكافأة الإعلان من الخادم (بدون إرسال قيمة المكافأة)
                     const adResult = await fetchApi({
-                        type: 'watchAd',
-                        reward: REWARD_PER_AD
+                        type: 'watchAd' // ⬅️ الخادم يحدد المكافأة (3 SHIB)
                     });
 
                     if (adResult.ok) {
+                        const actualReward = adResult.data.actual_reward; // ⬅️ استلام المكافأة الفعلية من الخادم
+                        
                         // 2. تحديث الواجهة بالقيم الموثوقة من الخادم
                         updateState({
                             balance: adResult.data.new_balance,
@@ -673,22 +672,19 @@ You will earn 5% of the revenue from every referral you bring through ads!
                         
                         // 3. منطق عمولة الإحالة (يرسل طلب عمولة منفصل)
                         if (referrerId) {
-                            const commissionAmount = REWARD_PER_AD * REFERRAL_COMMISSION_RATE;
                             
-                            // نرسل طلب العمولة، لا نحتاج للانتظار
+                            // ⬅️ نرسل طلب العمولة، الخادم سيحسبها بنفسه
                             fetchApi({
                                 type: 'commission',
                                 referrer_id: referrerId,
-                                referee_id: tgUser.id,
-                                amount: commissionAmount,
-                                source_reward: REWARD_PER_AD 
+                                referee_id: tgUser.id
                             }).then(r => {
                                 if (r.ok) { console.log('Commission sent successfully.'); }
                                 else { console.warn('Commission failed to send:', r.error); }
                             });
                         }
                         
-                        Telegram.WebApp.showAlert('🎉 Ad watched successfully! You earned ' + REWARD_PER_AD + ' SHIB.');
+                        Telegram.WebApp.showAlert('🎉 Ad watched successfully! You earned ' + actualReward + ' SHIB.');
                         if(adResult.data.new_ads_count >= DAILY_MAX){
                             Telegram.WebApp.showAlert('🎉 Great! You completed 100 ads today.');
                         }
@@ -750,7 +746,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
 
 
         /* ===== Spin Wheel (كود العجلة) ===== */
-        const sectors = [5, 10, 15, 20, 5]; 
         const colors = ['#f73859', '#38e3e7', '#f73859', '#ffd60a', '#38e3e7'];
         const canvas = document.getElementById('wheelCanvas');
         const ctx = canvas.getContext('2d');
@@ -826,7 +821,6 @@ You will earn 5% of the revenue from every referral you bring through ads!
             const spinReqResult = await fetchApi({ type: 'spin' });
 
             if (!spinReqResult.ok) {
-                // إذا فشل تسجيل الدورة، نتوقف.
                 return; 
             }
             
@@ -851,27 +845,18 @@ You will earn 5% of the revenue from every referral you bring through ads!
                     setTimeout(async ()=>{
                         canvas.style.transition = 'none'; 
                         
-                        const radPerSector = 2 * Math.PI / sectors.length;
-                        let normalizedAngle = currentAngle % (2 * Math.PI);
-                        let angleFromArrow = normalizedAngle + (Math.PI / 2); 
-                        let rawIndex = angleFromArrow / radPerSector;
-                        
-                        let idx = sectors.length - 1 - Math.floor(rawIndex % sectors.length);
-                        if (idx < 0) idx += sectors.length;
-
-                        const prize = sectors[idx];
-                        
-                        // 3. طلب تسجيل نتيجة الدوران وإضافة الجائزة للرصيد
+                        // 3. طلب تسجيل نتيجة الدوران وإضافة الجائزة للرصيد (بدون إرسال قيمة الجائزة!)
                         const spinResultPayload = {
-                            type: 'spinResult',
-                            prize: prize
+                            type: 'spinResult' // ⬅️ إرسال نوع الطلب فقط، الخادم يحسب الجائزة
                         };
                         const spinResultRes = await fetchApi(spinResultPayload);
                         
                         if (spinResultRes.ok) {
+                            const finalPrize = spinResultRes.data.actual_prize; // ⬅️ استلام الجائزة الحقيقية من الخادم
+                            
                             // 4. تحديث الرصيد بالرصيد الموثوق من الخادم
                             updateState({ balance: spinResultRes.data.new_balance });
-                            spinResult.textContent = `🎉 You won ${prize} SHIB!`;
+                            spinResult.textContent = `🎉 You won ${finalPrize} SHIB!`;
                         } else {
                             spinResult.textContent = `❌ Error receiving prize. Please check logs.`;
                         }
@@ -942,6 +927,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
             const binanceId = document.getElementById('binanceId').value.trim();
             const amount = parseInt(document.getElementById('withdrawAmount').value);
             
+            // ⬅️ لا يزال التحقق المحلي موجودًا لتجربة المستخدم، لكن التحقق الحاسم يحدث على الخادم
             if(!binanceId || binanceId.length < 8){ Telegram.WebApp.showAlert('Please enter a valid Binance User ID (min 8 digits).'); return; }
             if(isNaN(amount) || amount < 400){ Telegram.WebApp.showAlert('Minimum withdrawal is 400 SHIB.'); return; }
             if(amount > shibBalance){ Telegram.WebApp.showAlert('Insufficient balance. Your current balance is ' + shibBalance.toLocaleString() + ' SHIB.'); return; }
@@ -950,7 +936,7 @@ You will earn 5% of the revenue from every referral you bring through ads!
             const result = await fetchApi({
                 type: 'withdraw',
                 binanceId: binanceId,
-                amount: amount
+                amount: amount // ⬅️ يتم التحقق من صحة المبلغ والرصيد على الخادم
             });
 
             if (result.ok) {
