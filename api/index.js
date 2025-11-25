@@ -3,19 +3,25 @@
 /**
  * SHIB Ads WebApp Backend API
  * Handles all POST requests from the Telegram Mini App frontend.
- * Uses the Supabase REST API for persistence.
+ * Uses the Supabase REST API for persistence and includes strong Telegram signature validation.
  */
 
-// Load environment variables for Supabase connection
+// Load environment variables for Supabase and Telegram Bot Token
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const BOT_TOKEN = process.env.BOT_TOKEN; // ⬅️ يجب إضافة هذا المتغير في Vercel
+
+// تحميل وحدة التشفير (Crypto) المدمجة في بيئة Node.js (Vercel)
+const crypto = require('crypto');
 
 // ------------------------------------------------------------------
-// ثوابت المكافآت المحددة والمؤمنة بالكامل على الخادم (لضمان عدم التلاعب)
+// ثوابت المكافآت المحددة والمؤمنة بالكامل على الخادم
 // ------------------------------------------------------------------
 const REWARD_PER_AD = 3; 
 const REFERRAL_COMMISSION_RATE = 0.05;
 const SPIN_SECTORS = [5, 10, 15, 20, 5]; 
+const DAILY_MAX = 100; // حد الإعلانات اليومي
+const DAILY_MAX_SPINS = 15; // حد الدوران اليومي
 
 /**
  * Helper function to randomly select a prize from the defined sectors.
@@ -27,35 +33,16 @@ function calculateRandomSpinPrize() {
 
 // --- Helper Functions ---
 
-/**
- * Sends a JSON response with status 200.
- * @param {Response} res The response object.
- * @param {Object} data The data to include in the response body.
- */
 function sendSuccess(res, data = {}) {
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ ok: true, data }));
 }
 
-/**
- * Sends a JSON error response with status 400 or 500.
- * @param {Response} res The response object.
- * @param {string} message The error message.
- * @param {number} statusCode The HTTP status code (default 400).
- */
 function sendError(res, message, statusCode = 400) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ ok: false, error: message }));
 }
 
-/**
- * Executes a fetch request to the Supabase REST API.
- * @param {string} tableName The name of the Supabase table.
- * @param {string} method HTTP method (GET, POST, PATCH, DELETE).
- * @param {Object} body JSON body for POST/PATCH.
- * @param {string} queryParams URL search parameters (e.g., '?select=*').
- * @returns {Promise<Object>} The JSON response from Supabase.
- */
 async function supabaseFetch(tableName, method, body = null, queryParams = '?select=*') {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error('Supabase environment variables are not configured.');
@@ -78,20 +65,16 @@ async function supabaseFetch(tableName, method, body = null, queryParams = '?sel
 
   const response = await fetch(url, options);
   
-  // Handling success responses (2xx)
   if (response.ok) {
       const responseText = await response.text();
       try {
           const jsonResponse = JSON.parse(responseText);
-          // Supabase often returns an empty array on successful INSERT/UPDATE.
           return jsonResponse.length > 0 ? jsonResponse : { success: true }; 
       } catch (e) {
-          // Handle empty response body (e.g., 204 No Content)
           return { success: true }; 
       }
   }
 
-  // Handling error responses (4xx, 5xx)
   let data;
   try {
       data = await response.json();
@@ -104,25 +87,125 @@ async function supabaseFetch(tableName, method, body = null, queryParams = '?sel
   throw new Error(errorMsg);
 }
 
-// --- API Handlers ---
+// ------------------------------------------------------------------
+// 🔑 دالة التحقق الأمني من توقيع تليجرام (InitData Signature Validation)
+// ------------------------------------------------------------------
 
 /**
- * HANDLER: type: "getUserData"
+ * Helper to check the HMAC signature against Telegram's specification.
+ */
+function checkSignature({ hash, ...data }) {
+    // 1. Create a secret key based on the Bot Token
+    const secret = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
+    
+    // 2. Prepare the data check string
+    const dataCheckString = Object.keys(data)
+        .filter(key => key !== 'hash')
+        .sort()
+        .map(key => (`${key}=${data[key]}`))
+        .join('\n');
+
+    // 3. Calculate the signature hash
+    const hmac = crypto.createHmac('sha256', secret).update(dataCheckString).digest('hex');
+
+    // 4. Compare
+    return hmac === hash;
+}
+
+/**
+ * Parses initData string, validates signature, and returns the parsed data.
+ */
+function validateInitData(initData) {
+    if (!BOT_TOKEN) {
+        console.error("BOT_TOKEN is missing. Signature check disabled.");
+        return false;
+    }
+    
+    // Convert the query string into a parsable object
+    const params = new URLSearchParams(initData);
+    const data = {};
+    for (const [key, value] of params.entries()) {
+        data[key] = value;
+    }
+
+    if (!data.hash) return false;
+    
+    // Parse user object from JSON string
+    let user = null;
+    try {
+        if (data.user) {
+            user = JSON.parse(data.user);
+            data.user = user;
+        } else {
+             return false; // User data is essential for ID confirmation
+        }
+    } catch(e) {
+        return false;
+    }
+    
+    // Check for expiration (optional, but good practice)
+    if (data.auth_date && (Date.now() / 1000 - data.auth_date) > 86400) { // 24 hours
+        console.warn("InitData expired.");
+        // return false; 
+    }
+
+    if (!checkSignature(data)) {
+        console.error("InitData signature validation failed.");
+        return false;
+    }
+    
+    return data;
+}
+
+/**
+ * Global pre-handler to validate initData for all sensitive actions.
+ * @returns {Object|null} The validated InitData object or null on failure.
+ */
+async function securityPreCheck(res, body) {
+    const { init_data } = body;
+
+    if (!init_data) {
+        sendError(res, 'Missing Telegram WebApp initialization data for security check.', 403);
+        return null;
+    }
+
+    const validatedData = validateInitData(init_data);
+
+    if (!validatedData) {
+        sendError(res, 'Security validation failed. Request rejected.', 403);
+        return null;
+    }
+    
+    // Ensure the user_id in the body matches the validated user_id from initData
+    if (String(validatedData.user.id) !== String(body.user_id)) {
+         sendError(res, 'User ID mismatch. Security check failed.', 403);
+         return null;
+    }
+
+    return validatedData;
+}
+
+// --- API Handlers ---
+
+// handleGetUserData و handleRegister و handleSpinResult و handleWithdraw بحاجة إلى تحديث لتضمين securityPreCheck
+
+/**
+ * HANDLER: type: "getUserData" - لا يحتاج لـ securityPreCheck لأنه للقراءة فقط
  * Fetches the current user data (balance, counts, history, and referrals) for UI initialization.
  */
 async function handleGetUserData(req, res, body) {
+    // ... (logic remains mostly the same, ensuring user_id is present)
     const { user_id } = body;
 
     if (!user_id) {
         return sendError(res, 'Missing user_id for data fetch.');
     }
     const id = parseInt(user_id);
-
+    
     try {
         // 1. Fetch user data (balance, ads_watched_today, spins_today)
         const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance,ads_watched_today,spins_today`);
         if (!users || users.length === 0 || users.success) {
-            // Return default state if user not found (should be handled by register first)
             return sendSuccess(res, { 
                 balance: 0, 
                 ads_watched_today: 0, 
@@ -156,19 +239,18 @@ async function handleGetUserData(req, res, body) {
 
 
 /**
- * 1) type: "register"
+ * 1) type: "register" - لا يحتاج لـ securityPreCheck لأنه يتم استدعاؤه قبل توفر initData أحياناً
  * Creates a new user if they don't exist.
  */
 async function handleRegister(req, res, body) {
+    // ... (logic remains the same)
   const { user_id, ref_by } = body;
   const id = parseInt(user_id);
 
   try {
-    // 1. Check if user exists
     const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=id`);
 
     if (!Array.isArray(users) || users.length === 0) {
-      // 2. User does not exist, create new user
       const newUser = {
         id,
         balance: 0,
@@ -189,288 +271,273 @@ async function handleRegister(req, res, body) {
 
 /**
  * 2) type: "watchAd"
- * Adds reward to user balance and increments ads_watched_today.
- * الحماية: تستخدم REWARD_PER_AD من الخادم فقط.
+ * 🔒 الحماية: توقيع تليجرام + التحقق الصارم من الحد اليومي (100) + حساب عمولة الإحالة على الخادم.
  */
 async function handleWatchAd(req, res, body) {
-  const { user_id } = body;
-  const id = parseInt(user_id);
-  const reward = REWARD_PER_AD; // ⬅️ قيمة المكافأة مأخوذة من الخادم (آمنة)
+    // ⬅️ تحقق أمني من توقيع تليجرام
+    const validatedData = await securityPreCheck(res, body);
+    if (!validatedData) return;
 
-  try {
-    // 1. Fetch current user data
-    const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance,ads_watched_today`);
-    if (!Array.isArray(users) || users.length === 0) {
-        return sendError(res, 'User not found.', 404);
+    const id = parseInt(validatedData.user.id);
+    const reward = REWARD_PER_AD; 
+
+    try {
+        // 1. Fetch current user data (limit check + ref_by)
+        const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance,ads_watched_today,ref_by`);
+        if (!Array.isArray(users) || users.length === 0) {
+            return sendError(res, 'User not found.', 404);
+        }
+        
+        const user = users[0];
+        
+        // ⬅️ التحقق الصارم من الحد اليومي (100)
+        if (user.ads_watched_today >= DAILY_MAX) {
+            return sendError(res, `Daily ad limit (${DAILY_MAX}) reached.`, 403);
+        }
+        
+        const newBalance = user.balance + reward;
+        const newAdsCount = user.ads_watched_today + 1;
+
+        // 2. Update user record: balance and ads_watched_today
+        await supabaseFetch('users', 'PATCH', 
+          { balance: newBalance, ads_watched_today: newAdsCount }, 
+          `?id=eq.${id}`);
+
+        // 3. Save to ads_history
+        await supabaseFetch('ads_history', 'POST', 
+          { user_id: id, reward }, 
+          '?select=user_id');
+
+        // 4. 💰 معالجة عمولة الإحالة (تلقائيًا على الخادم)
+        if (user.ref_by) {
+             const commissionAmount = reward * REFERRAL_COMMISSION_RATE;
+             
+             // Fetch referrer's balance
+             const referrers = await supabaseFetch('users', 'GET', null, `?id=eq.${user.ref_by}&select=balance`);
+             if (Array.isArray(referrers) && referrers.length > 0) {
+                 const newRefBalance = referrers[0].balance + commissionAmount;
+                 
+                 // Update referrer balance
+                 await supabaseFetch('users', 'PATCH', 
+                   { balance: newRefBalance }, 
+                   `?id=eq.${user.ref_by}`);
+
+                 // Add record to commission_history
+                 await supabaseFetch('commission_history', 'POST', 
+                   { referrer_id: user.ref_by, referee_id: id, amount: commissionAmount, source_reward: reward }, 
+                   '?select=referrer_id');
+             }
+        }
+
+        // 5. Return new state
+        sendSuccess(res, { new_balance: newBalance, new_ads_count: newAdsCount, actual_reward: reward });
+    } catch (error) {
+        console.error('WatchAd failed:', error.message);
+        sendError(res, `WatchAd failed: ${error.message}`, 500);
     }
-    
-    const user = users[0];
-    const newBalance = user.balance + reward;
-    const newAdsCount = user.ads_watched_today + 1;
-
-    // 2. Update user record: balance and ads_watched_today
-    await supabaseFetch('users', 'PATCH', 
-      { balance: newBalance, ads_watched_today: newAdsCount }, 
-      `?id=eq.${id}`);
-
-    // 3. Save to ads_history
-    await supabaseFetch('ads_history', 'POST', 
-      { user_id: id, reward }, 
-      '?select=user_id');
-
-    // 4. Return new state
-    sendSuccess(res, { new_balance: newBalance, new_ads_count: newAdsCount, actual_reward: reward }); // ⬅️ إرجاع المكافأة الحقيقية
-  } catch (error) {
-    console.error('WatchAd failed:', error.message);
-    sendError(res, `WatchAd failed: ${error.message}`, 500);
-  }
 }
 
-/**
- * 3) type: "commission"
- * Adds commission to referrer balance and logs the event.
- * الحماية: تحسب قيمة العمولة على الخادم.
- */
-async function handleCommission(req, res, body) {
-  const { referrer_id, referee_id } = body; // ⬅️ تم إزالة 'amount' و 'source_reward' من مدخلات العميل
-
-  if (!referrer_id || !referee_id) {
-    // لا يعتبر خطأ حرج، يتم إيقاف العملية بهدوء إذا لم تتوفر بيانات الإحالة
-    return sendSuccess(res, { message: 'Invalid commission data received but acknowledged.' });
-  }
-
-  const referrerId = parseInt(referrer_id);
-  const refereeId = parseInt(referee_id);
-  
-  // ⬅️ حساب العمولة بشكل آمن على الخادم
-  const sourceReward = REWARD_PER_AD;
-  const commissionAmount = sourceReward * REFERRAL_COMMISSION_RATE; 
-
-  try {
-    // 1. Fetch current referrer balance
-    const users = await supabaseFetch('users', 'GET', null, `?id=eq.${referrerId}&select=balance`);
-    if (!Array.isArray(users) || users.length === 0) {
-        // Referrer not found, abort commission gracefully.
-        return sendSuccess(res, { message: 'Referrer not found, commission aborted.' });
-    }
-    
-    const newBalance = users[0].balance + commissionAmount;
-
-    // 2. Update referrer balance
-    await supabaseFetch('users', 'PATCH', 
-      { balance: newBalance }, 
-      `?id=eq.${referrerId}`);
-
-    // 3. Add record to commission_history
-    await supabaseFetch('commission_history', 'POST', 
-      { referrer_id: referrerId, referee_id: refereeId, amount: commissionAmount, source_reward: sourceReward }, 
-      '?select=referrer_id');
-
-    sendSuccess(res, { new_referrer_balance: newBalance });
-  } catch (error) {
-    console.error('Commission failed:', error.message);
-    sendError(res, `Commission failed: ${error.message}`, 500);
-  }
-}
 
 /**
- * 4) type: "spin"
- * Increments spins_today and logs the request.
+ * 3) type: "spin"
+ * 🔒 الحماية: توقيع تليجرام + التحقق الصارم من الحد اليومي (15).
  */
 async function handleSpin(req, res, body) {
-  const { user_id } = body;
-  const id = parseInt(user_id);
+    // ⬅️ تحقق أمني من توقيع تليجرام
+    const validatedData = await securityPreCheck(res, body);
+    if (!validatedData) return;
 
-  try {
-    // 1. Fetch current user data
-    const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=spins_today`);
-    if (!Array.isArray(users) || users.length === 0) {
-        return sendError(res, 'User not found.', 404);
+    const id = parseInt(validatedData.user.id);
+
+    try {
+        // 1. Fetch current user data (limit check)
+        const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=spins_today`);
+        if (!Array.isArray(users) || users.length === 0) {
+            return sendError(res, 'User not found.', 404);
+        }
+        
+        const user = users[0];
+        
+        // ⬅️ التحقق الصارم من الحد اليومي (15)
+        if (user.spins_today >= DAILY_MAX_SPINS) {
+            return sendError(res, `Daily spin limit (${DAILY_MAX_SPINS}) reached.`, 403);
+        }
+
+        const newSpinsCount = user.spins_today + 1;
+
+        // 2. Update user record: spins_today
+        await supabaseFetch('users', 'PATCH', 
+          { spins_today: newSpinsCount }, 
+          `?id=eq.${id}`);
+
+        // 3. Save to spin_requests
+        await supabaseFetch('spin_requests', 'POST', 
+          { user_id: id }, 
+          '?select=user_id');
+
+        sendSuccess(res, { new_spins_today: newSpinsCount });
+    } catch (error) {
+        console.error('Spin request failed:', error.message);
+        sendError(res, `Spin request failed: ${error.message}`, 500);
     }
-    
-    const newSpinsCount = users[0].spins_today + 1;
-
-    // 2. Update user record: spins_today
-    await supabaseFetch('users', 'PATCH', 
-      { spins_today: newSpinsCount }, 
-      `?id=eq.${id}`);
-
-    // 3. Save to spin_requests
-    await supabaseFetch('spin_requests', 'POST', 
-      { user_id: id }, 
-      '?select=user_id');
-
-    sendSuccess(res, { new_spins_today: newSpinsCount });
-  } catch (error) {
-    console.error('Spin request failed:', error.message);
-    sendError(res, `Spin request failed: ${error.message}`, 500);
-  }
 }
 
 /**
- * 5) type: "spinResult"
- * يحسب الجائزة على الخادم، يضيفها إلى رصيد المستخدم، ويسجل النتيجة.
- * الحماية: تتجاهل أي قيمة 'prize' من العميل.
+ * 4) type: "spinResult"
+ * 🔒 الحماية: توقيع تليجرام.
  */
 async function handleSpinResult(req, res, body) {
-  const { user_id } = body; 
-  const id = parseInt(user_id);
-  
-  // ⬅️ حساب الجائزة بشكل آمن على الخادم
-  const prize = calculateRandomSpinPrize(); 
-
-  try {
-    // 1. Fetch current user balance
-    const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance`);
-    if (!Array.isArray(users) || users.length === 0) {
-        return sendError(res, 'User not found.', 404);
-    }
+    // ⬅️ تحقق أمني من توقيع تليجرام
+    const validatedData = await securityPreCheck(res, body);
+    if (!validatedData) return;
     
-    const newBalance = users[0].balance + prize;
+    const id = parseInt(validatedData.user.id);
+    const prize = calculateRandomSpinPrize(); 
 
-    // 2. Update user record: balance
-    await supabaseFetch('users', 'PATCH', 
-      { balance: newBalance }, 
-      `?id=eq.${id}`);
+    try {
+        // 1. Fetch current user balance
+        const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance`);
+        if (!Array.isArray(users) || users.length === 0) {
+            return sendError(res, 'User not found.', 404);
+        }
+        
+        const newBalance = users[0].balance + prize;
 
-    // 3. Save to spin_results
-    await supabaseFetch('spin_results', 'POST', 
-      { user_id: id, prize }, 
-      '?select=user_id');
+        // 2. Update user record: balance
+        await supabaseFetch('users', 'PATCH', 
+          { balance: newBalance }, 
+          `?id=eq.${id}`);
 
-    // 4. إرجاع الجائزة الحقيقية المحسوبة في الخادم
-    sendSuccess(res, { new_balance: newBalance, actual_prize: prize }); 
-  } catch (error) {
-    console.error('Spin result failed:', error.message);
-    sendError(res, `Spin result failed: ${error.message}`, 500);
-  }
+        // 3. Save to spin_results
+        await supabaseFetch('spin_results', 'POST', 
+          { user_id: id, prize }, 
+          '?select=user_id');
+
+        sendSuccess(res, { new_balance: newBalance, actual_prize: prize }); 
+    } catch (error) {
+        console.error('Spin result failed:', error.message);
+        sendError(res, `Spin result failed: ${error.message}`, 500);
+    }
 }
 
 /**
- * 6) type: "withdraw"
- * Subtracts amount from user balance and creates a withdrawal record.
+ * 5) type: "withdraw"
+ * 🔒 الحماية: توقيع تليجرام + تحقق من الحد الأدنى والرصيد.
  */
 async function handleWithdraw(req, res, body) {
-  const { user_id, binanceId, amount } = body;
-  const id = parseInt(user_id);
-  
-  if (typeof amount !== 'number' || amount <= 0) {
-        return sendError(res, 'Invalid withdrawal amount.', 400);
-  }
-  
-  // ⬅️ المنطق الأمني: التحقق من الرصيد والحد الأدنى على الخادم
-
-  try {
-    // 1. Fetch current user balance to ensure sufficient funds
-    const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance`);
-    if (!Array.isArray(users) || users.length === 0) {
-        return sendError(res, 'User not found.', 404);
-    }
-
-    const currentBalance = users[0].balance;
-    if (amount < 400) { // الحد الأدنى المكرر هنا للتأكيد
-        return sendError(res, 'Minimum withdrawal is 400 SHIB.', 403);
-    }
-    if (amount > currentBalance) {
-        return sendError(res, 'Insufficient balance.', 403);
-    }
+    // ⬅️ تحقق أمني من توقيع تليجرام
+    const validatedData = await securityPreCheck(res, body);
+    if (!validatedData) return;
     
-    const newBalance = currentBalance - amount;
+    const id = parseInt(validatedData.user.id);
+    const { binanceId, amount } = body;
+  
+    if (typeof amount !== 'number' || amount <= 0) {
+        return sendError(res, 'Invalid withdrawal amount.', 400);
+    }
 
-    // 2. Update user record: balance
-    await supabaseFetch('users', 'PATCH', 
-      { balance: newBalance }, 
-      `?id=eq.${id}`);
+    try {
+        // 1. Fetch current user balance to ensure sufficient funds
+        const users = await supabaseFetch('users', 'GET', null, `?id=eq.${id}&select=balance`);
+        if (!Array.isArray(users) || users.length === 0) {
+            return sendError(res, 'User not found.', 404);
+        }
 
-    // 3. Create record in withdrawals table
-    await supabaseFetch('withdrawals', 'POST', {
-      user_id: id,
-      binance_id: binanceId,
-      amount: amount,
-      status: 'Pending',
-    }, '?select=user_id');
+        const currentBalance = users[0].balance;
+        if (amount < 400) { 
+            return sendError(res, 'Minimum withdrawal is 400 SHIB.', 403);
+        }
+        if (amount > currentBalance) {
+            return sendError(res, 'Insufficient balance.', 403);
+        }
+        
+        const newBalance = currentBalance - amount;
 
-    sendSuccess(res, { new_balance: newBalance });
-  } catch (error) {
-    console.error('Withdrawal failed:', error.message);
-    sendError(res, `Withdrawal failed: ${error.message}`, 500);
-  }
+        // 2. Update user record: balance
+        await supabaseFetch('users', 'PATCH', 
+          { balance: newBalance }, 
+          `?id=eq.${id}`);
+
+        // 3. Create record in withdrawals table
+        await supabaseFetch('withdrawals', 'POST', {
+          user_id: id,
+          binance_id: binanceId,
+          amount: amount,
+          status: 'Pending',
+        }, '?select=user_id');
+
+        sendSuccess(res, { new_balance: newBalance });
+    } catch (error) {
+        console.error('Withdrawal failed:', error.message);
+        sendError(res, `Withdrawal failed: ${error.message}`, 500);
+    }
 }
 
 // --- Main Handler for Vercel/Serverless ---
 
-/**
- * The entry point for the Vercel/Serverless function.
- * @param {Request} req The incoming request object.
- * @param {Response} res The outgoing response object.
- */
 module.exports = async (req, res) => {
-  // CORS configuration
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    // ... (CORS and method checks) ...
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return sendSuccess(res);
-  }
+    if (req.method === 'OPTIONS') {
+        return sendSuccess(res);
+    }
 
-  if (req.method !== 'POST') {
-    return sendError(res, `Method ${req.method} not allowed. Only POST is supported.`, 405);
-  }
+    if (req.method !== 'POST') {
+        return sendError(res, `Method ${req.method} not allowed. Only POST is supported.`, 405);
+    }
 
-  let body;
-  try {
-    body = await new Promise((resolve, reject) => {
-      let data = '';
-      req.on('data', chunk => {
-        data += chunk.toString();
-      });
-      req.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch (e) {
-          reject(new Error('Invalid JSON payload.'));
-        }
-      });
-      req.on('error', reject);
-    });
+    let body;
+    try {
+        body = await new Promise((resolve, reject) => {
+            let data = '';
+            req.on('data', chunk => {
+                data += chunk.toString();
+            });
+            req.on('end', () => {
+                try {
+                    resolve(JSON.parse(data));
+                } catch (e) {
+                    reject(new Error('Invalid JSON payload.'));
+                }
+            });
+            req.on('error', reject);
+        });
+    } catch (error) {
+        return sendError(res, error.message, 400);
+    }
 
-  } catch (error) {
-    return sendError(res, error.message, 400);
-  }
-
-  if (!body || !body.type) {
-    return sendError(res, 'Missing "type" field in the request body.', 400);
-  }
-  
-  if (!body.user_id && body.type !== 'commission') {
-      return sendError(res, 'Missing user_id in the request body.', 400);
-  }
-
-  // Route the request based on the 'type' field
-  switch (body.type) {
-    case 'getUserData':
-      await handleGetUserData(req, res, body);
-      break;
-    case 'register':
-      await handleRegister(req, res, body);
-      break;
-    case 'watchAd':
-      await handleWatchAd(req, res, body);
-      break;
-    case 'commission':
-      await handleCommission(req, res, body);
-      break;
-    case 'spin':
-      await handleSpin(req, res, body);
-      break;
-    case 'spinResult':
-      await handleSpinResult(req, res, body);
-      break;
-    case 'withdraw':
-      await handleWithdraw(req, res, body);
-      break;
-    default:
-      sendError(res, `Unknown action type: ${body.type}`, 400);
-  }
+    if (!body || !body.type) {
+        return sendError(res, 'Missing "type" field in the request body.', 400);
+    }
+    
+    if (!body.user_id && body.type !== 'commission') { // Commission is removed, but keep check general
+        return sendError(res, 'Missing user_id in the request body.', 400);
+    }
+    
+    // Route the request based on the 'type' field
+    switch (body.type) {
+        case 'getUserData':
+            await handleGetUserData(req, res, body);
+            break;
+        case 'register':
+            await handleRegister(req, res, body);
+            break;
+        case 'watchAd':
+            await handleWatchAd(req, res, body);
+            break;
+        case 'spin':
+            await handleSpin(req, res, body);
+            break;
+        case 'spinResult':
+            await handleSpinResult(req, res, body);
+            break;
+        case 'withdraw':
+            await handleWithdraw(req, res, body);
+            break;
+        default:
+            sendError(res, `Unknown action type: ${body.type}`, 400);
+    }
 };
