@@ -54,12 +54,41 @@
         .main-screen{position:fixed;inset:0;background:#f5f7fa;opacity:0;transition:opacity .5s ease-in;display:flex;flex-direction:column}
         .main-screen.visible{opacity:1}
         .main-content{flex:1;display:flex;justify-content:center;align-items:center}
-        .user-circle{position:absolute;top:20px;left:20px;width:70px;height:70px;border:2px dashed #ccc;border-radius:50%;display:flex;flex-direction:column;justify-content:center;align-items:center;cursor:pointer;transition:all .3s ease;z-index:100;overflow:hidden}
+        
+        /* التعديل: الدائرة نفسها - بدون تغييرات كبيرة */
+        .user-circle{
+            position:absolute;top:20px;left:20px;width:70px;height:70px;border:2px dashed #ccc;
+            border-radius:50%;display:flex;flex-direction:column;justify-content:center;
+            align-items:center;cursor:pointer;transition:all .3s ease;z-index:100;overflow:hidden
+        }
         .user-circle:hover{border-color:#4a90e2;background:rgba(74,144,226,.05)}
+        /* ضمان عرض الصورة بشكل صحيح */
         .user-circle img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:none}
         .user-circle .placeholder{color:#999;font-size:12px;text-align:center}
-        .user-username{margin-top:72px;font-size:13px;color:#555;white-space:nowrap}
-        .user-id{margin-top:88px;font-size:11px;color:#888;white-space:nowrap}
+        
+        /* التعديل المطلوب: وضع الاسم تحت الدائرة مباشرة */
+        .user-username{
+            position: absolute;
+            top: 95px; /* (20px Top + 70px Height) + 5px Margin */
+            left: 20px;
+            width: 70px; /* نفس عرض الدائرة للتوسيط */
+            font-size:13px;color:#555;white-space:nowrap;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis; /* لإظهار "..." للنصوص الطويلة */
+        }
+        /* التعديل المطلوب: وضع الـ ID تحت الاسم مباشرة */
+        .user-id{
+            position: absolute;
+            top: 115px; /* أسفل الاسم بمسافة مناسبة */
+            left: 20px;
+            width: 70px;
+            font-size:11px;color:#888;white-space:nowrap;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         .balance{position:absolute;top:20px;right:20px;background:#fff;border:1px solid #ff5a5a;border-radius:12px;padding:8px 12px;font-family:'Courier New',monospace;font-size:16px;color:#ff2a2a;text-shadow:0 0 2px #ffbbbb;letter-spacing:1px;z-index:101;box-shadow:0 4px 6px rgba(0,0,0,.05)}
         
         /* حاويات التقدم المشتركة */
@@ -311,9 +340,10 @@
         <div class="user-circle" onclick="circleClick()">
             <img id="userImage" src="" alt="User">
             <div class="placeholder">+</div>
-            <div class="user-username" id="userName"></div>
-            <div class="user-id" id="userId"></div>
         </div>
+        <div class="user-username" id="userName"></div>
+        <div class="user-id" id="userId"></div>
+        
         <div class="main-content"></div>
         
         <div class="button-container">
