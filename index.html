@@ -429,7 +429,7 @@
         const API_URL = '/api'; // ⬅️ **تعديل هام:** استبدل هذا برابط Vercel الكامل بعد النشر
 
         // ------------------------------------------------------------------
-        // **دالة fetchApi المُحَدَّثة** (تضيف التوقيع الأمني)
+        // **دالة fetchApi المُحَدَّثة** (تضيف التوقيع الأمني وتصلح أخطاء Progress)
         // ------------------------------------------------------------------
         async function fetchApi(payload) {
             if (!tgUser) {
@@ -440,6 +440,7 @@
             // ⬅️ الإضافة الأمنية: إرسال initData مع كل طلب
             const initData = Telegram.WebApp.initData || '';
 
+            // ⬅️ إصلاح خطأ TypeError: is not a function
             if (typeof Telegram.WebApp.showProgress === 'function') {
                 Telegram.WebApp.showProgress();
             }
@@ -453,10 +454,11 @@
                     body: JSON.stringify({
                         ...payload,
                         user_id: tgUser.id,
-                        init_data: initData // ⬅️ إضافة بيانات التوقيع
+                        init_data: initData // ⬅️ إضافة بيانات التوقيع (الأمان)
                     }),
                 });
 
+                // ⬅️ إصلاح خطأ TypeError: is not a function
                 if (typeof Telegram.WebApp.hideProgress === 'function') {
                     Telegram.WebApp.hideProgress();
                 }
@@ -479,6 +481,7 @@
 
                 return data;
             } catch (error) {
+                // ⬅️ إصلاح خطأ TypeError: is not a function في حالة خطأ الشبكة
                 if (typeof Telegram.WebApp.hideProgress === 'function') {
                     Telegram.WebApp.hideProgress();
                 }
@@ -575,7 +578,7 @@
         async function loadUserData() {
             if (!tgUser) return;
             
-            // getUserData لا يحتاج لإرسال init_data لأنه للقراءة فقط
+            // لا حاجة لـ init_data هنا لأنها عملية قراءة غير حساسة.
             const result = await fetchApi({ type: 'getUserData' });
 
             if (result.ok) {
@@ -596,13 +599,13 @@
         async function initDailyProgress(){
             if (!tgUser) return;
 
-            // 1. التسجيل/التحقق من الوجود
+            // 1. التسجيل/التحقق من الوجود (لا يحتاج init_data)
             await fetchApi({ 
                 type: 'register',
                 ref_by: referrerId ? referrerId : null 
             });
             
-            // 2. تحميل بيانات المستخدم بعد التسجيل/التأكد من الوجود
+            // 2. تحميل بيانات المستخدم
             await loadUserData(); 
         }
         
@@ -664,6 +667,7 @@
                 return;
             }
             
+            // إظهار الإعلان أولاً
             window.showGiga()
                 .then(async () => {
                     // 1. طلب مكافأة الإعلان من الخادم (سيتم إرسال التوقيع والتحقق من الحد)
@@ -680,12 +684,12 @@
                             ads_watched_today: adResult.data.new_ads_count
                         });
                         
+                        // الخادم هو من يعالج العمولة والحدود الآن.
+                        
                         Telegram.WebApp.showAlert('🎉 Ad watched successfully! You earned ' + actualReward + ' SHIB.');
                         if(adResult.data.new_ads_count >= DAILY_MAX){
                             Telegram.WebApp.showAlert('🎉 Great! You completed 100 ads today.');
                         }
-                    } else if (adResult.error && adResult.error.includes('Daily ad limit')) {
-                        // يتم التعامل مع خطأ تجاوز الحد من الخادم
                     }
                 })
                 .catch(e => {
@@ -740,7 +744,7 @@
             if(!tgUser){ referralLinkInput.value='User data not available.'; return; }
             const userId = tgUser.id;
             // يجب تحديث [bot_username] باسم البوت الفعلي 
-            const botUsername = "Game_win_usdtBot"; 
+            const botUsername = "Game_win_usdtBot"; // ⬅️ تأكد من أن هذا هو اسم البوت الصحيح
             const inviteLink=`https://t.me/${botUsername}?startapp=ref_${userId}`;
             referralLinkInput.value=inviteLink;
         }
@@ -775,7 +779,6 @@
             const spinReqResult = await fetchApi({ type: 'spin' });
 
             if (!spinReqResult.ok) {
-                // إذا فشل الطلب (بسبب تجاوز الحد مثلاً)، نتوقف
                 return; 
             }
             
@@ -839,8 +842,7 @@
             }
 
             let historyHTML = '';
-            withdrawalHistory.sort((a, b) => new Date(b.date) - new Date(a.date)); // ترتيب تنازلي حسب التاريخ
-
+            // لا نحتاج لفرز هنا إذا كان الخادم يرسلها مرتبة
             withdrawalHistory.forEach(item => {
                 historyHTML += `
                     <div class="history-item">
